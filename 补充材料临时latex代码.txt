@@ -1,0 +1,633 @@
+\documentclass[journal,onecolumn]{IEEEtran}
+
+\usepackage[UTF8, scheme=plain, fontset=ubuntu]{ctex}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{geometry}
+
+% ==========================================
+% 单栏排版优化：适当增加行距，提升长公式阅读体验
+% ==========================================
+\geometry{a4paper, margin=1in}
+\linespread{1.3}
+
+% ==========================================
+% 补充材料专属前缀重定义
+% 自动将图、表、公式、章节标号加上 "S" 前缀
+% ==========================================
+\newcommand{\beginsupplement}{%
+        \setcounter{table}{0}
+        \renewcommand{\thetable}{S\arabic{table}}%
+        \setcounter{figure}{0}
+        \renewcommand{\thefigure}{S\arabic{figure}}%
+        \setcounter{equation}{0}
+        \renewcommand{\theequation}{S.\arabic{equation}}%
+        \setcounter{section}{0}
+        \renewcommand{\thesection}{S.\Roman{section}}%
+     }
+
+\begin{document}
+
+% ==========================================
+% 补充材料标题页
+% ==========================================
+\title{Supplementary Material for ``BiSARC: Bidirectional State-Aligned Compression for Bandwidth-Efficient Federated Learning''}
+
+\author{Your Name, Your Co-authors...}
+
+\maketitle
+\beginsupplement
+
+This document provides supplementary materials to the main paper.
+
+% ==========================================
+% S.I 符号表
+% ==========================================
+\section{Notation Tables}
+\label{sec:sup_notation}
+
+表 \ref{tab:notation_global} 至表 \ref{tab:notation_packing} 汇总了本文方法描述、算法实现以及理论分析中所使用的主要数学符号及其物理意义。
+
+\begin{table}[htbp]
+\centering
+\caption{全局系统与优化参数}
+\label{tab:notation_global}
+\begin{tabular}{lp{6cm}p{6cm}}
+\toprule
+\textbf{符号} & \textbf{定义} & \textbf{物理意义} \\
+\midrule
+$K$ & 客户端总数 & 联邦系统的总规模 \\
+$S_t$ & 第 $t$ 轮采样的活跃客户端集合 & 本轮参与通信与训练的节点子集 \\
+$m$ & 单轮采样客户端数量 & $m = |S_t|$ \\
+$p_k$ & 客户端 $k$ 的聚合权重 & 数据量占比 $p_k = |\mathcal{D}_k| / \sum |\mathcal{D}_i|$ \\
+$T$ & 全局主训练通信总轮数 & 控制全局优化的迭代周期 \\
+$E$ & 客户端本地训练的总迭代步数 & 控制本地多步 SGD 的总深度 \\
+$\eta_t$ & 第 $t$ 轮的学习率 & 理论推导中假定满足 $\eta_t \le 1/(EL)$ 的下降步长 \\
+$d$ & 模型总参数维度 & 决定原始稠密张量的大小 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{数学推导辅助变量}
+\label{tab:notation_theory}
+\begin{tabular}{lp{6cm}p{6cm}}
+\toprule
+\textbf{符号} & \textbf{定义} & \textbf{物理意义} \\
+\midrule
+$F(w), F_k(w)$ & 全局与本地目标函数 & 联邦优化的数学目标 \\
+$L, G$ & 平滑常数、梯度范数上界 & 刻画损失函数平滑性与梯度有界性的常数 \\
+$\sigma^2, \zeta^2$ & 随机抽样方差上界、数据异质性界限 & 约束局部随机噪声与系统空间异质性的界限 \\
+$\tilde{w}_t$ & 第 $t$ 轮的全局虚拟同步模型 & 将双向截断误差重新注入后的无压缩序列 \\
+$D_{t,k}$ & 第 $t$ 轮客户端 $k$ 的初始化漂移 & $D_{t,k} \triangleq \mathbb{E}\|w_{t,k}^0 - \tilde{w}_t\|^2$，衡量起点偏离程度 \\
+$\xi$ & 本地数据抽样变量 & 表示每步 SGD 中的随机样本，用于刻画抽样噪声 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{上下行链路双向压缩变量}
+\label{tab:notation_compression}
+\begin{tabular}{lp{6cm}p{6cm}}
+\toprule
+\textbf{符号} & \textbf{定义} & \textbf{物理意义} \\
+\midrule
+$\Delta w_{t,k}$ & 第 $t$ 轮客户端 $k$ 产生的稠密局部更新 & 训练前后参数差 $\Delta w_{t,k} = w_{t+1,k} - w_{t+1}^{sync}$ \\
+$e_{t,k}^{up}, e_t^{down}$ & 上行 / 下行误差缓冲 & 被压缩截断但未发送的保留信息 \\
+$u_{t,k}^{up}, u_t^{down}$ & 上行 / 下行补偿向量 & 局部更新（或全局聚合）与历史残差的叠加 \\
+$\mathcal{C}_{up}(\cdot), \mathcal{C}_{down}(\cdot)$ & 上下行 Top-$k$ 压缩算子 & 具有收缩常数 $\delta_{up}$ 和 $\delta_{down}$ 的有偏算子 \\
+$c_{t,k}^{up}, c_t^{down}$ & 实际上传/广播的压缩残差 & 物理传输的稀疏载荷 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{位级打包系统变量}
+\label{tab:notation_packing}
+\begin{tabular}{lp{6cm}p{6cm}}
+\toprule
+\textbf{符号} & \textbf{定义} & \textbf{物理意义} \\
+\midrule
+$M_{bool}$ & 张量的全局布尔掩码 & 稀疏结构的逻辑表示 \\
+$M_{byte}$ & 位紧缩后的连续物理字节流 & 以 uint8 存储的物理传输掩码，体积为 $\lceil d/8 \rceil$ \\
+$V$ & 连续的非零浮点值数组 & 物理传输的有效参数浮点数组 \\
+$\tilde{x}$ & 解包恢复的稠密稀疏张量 & 在接收端通过位展开重建的内存状态 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ==========================================
+% S.II 详细理论证明
+% ==========================================
+\section{Detailed Theoretical Proofs}
+\label{sec:sup_proofs}
+
+本节提供主文中定理与引理的详细证明。推导基于主文中的标准假设（$L$-平滑、下界有界、局部无偏及二阶矩有界、数据异质性边界以及算子收缩性）。
+
+\subsection{Target Inconsistency under Uniform Weight Relaxation}
+\label{subsec:sup_weight_relaxation}
+在真实的联邦学习场景中，客户端 $k$ 的真实聚合权重由其本地数据量决定，即 $p_k = |\mathcal{D}_k| / \sum_{i=1}^K |\mathcal{D}_i|$。系统实际目标为 $F^*(w) = \sum_{k=1}^K p_k F_k(w)$。
+
+为保证虚拟序列在均匀采样下的无偏性，理论分析采用了代理目标函数 $F(w) = \frac{1}{K}\sum_{k=1}^K F_k(w)$。该权重松弛引入的目标不一致性梯度偏差 $\Delta_{obj}$ 为：
+\begin{equation}
+    \Delta_{obj} = \|\nabla F^*(w) - \nabla F(w)\|^2 = \left\| \sum_{k=1}^K \left(p_k - \frac{1}{K}\right) \nabla F_k(w) \right\|^2
+\end{equation}
+利用三角不等式展开，并结合单步随机梯度二阶矩有界性导出的真实梯度有界性质（$\|\nabla F_k(w)\| \le G$）：
+\begin{equation}
+    \Delta_{obj} \le \left( \sum_{k=1}^K \left| p_k - \frac{1}{K} \right| \|\nabla F_k(w)\| \right)^2 
+    \le G^2 \left( \sum_{k=1}^K \left| p_k - \frac{1}{K} \right| \cdot 1 \right)^2
+\end{equation}
+其中，$\|\nabla F_k(w)\| \le G$ 的有界性条件即主文 Assumption 2 所述。
+应用柯西-施瓦茨不等式：
+\begin{equation}
+    \left( \sum_{k=1}^K \left| p_k - \frac{1}{K} \right| \cdot 1 \right)^2 \le \left( \sum_{k=1}^K \left| p_k - \frac{1}{K} \right|^2 \right) \left( \sum_{k=1}^K 1^2 \right) = K \sum_{k=1}^K \left( p_k - \frac{1}{K} \right)^2
+\end{equation}
+得到最终边界：
+\begin{equation}
+    \Delta_{obj} \le G^2 K \sum_{k=1}^K \left( p_k - \frac{1}{K} \right)^2
+\end{equation}
+其中右端仅依赖于客户端数量 $K$ 及各客户端数据规模 $|D_k|$，在训练过程中不随通信轮次 $t$ 变化，因此是一个有界常数。
+
+这表明，由数据量不均衡所引入的影响可被视为一种有界的结构性偏差项，其作用是在全局梯度中引入一个与模型参数 $w$ 无关的扰动项。由于该偏差项仅依赖于客户端权重分布 $\{p_k\}_{k=1}^K$，而与模型参数 $w$ 无关，因此在梯度差分 $\nabla F(w) - \nabla F(w')$ 中会相互抵消。这保证了目标函数原有的 Lipschitz 平滑性质不受影响。
+
+此外，该偏差项在优化过程中表现为一个有界的常数项。由于现有收敛性分析中，数据异质性常数 $\zeta^2$ 同样以加性形式作为误差下界项出现，因此该偏差项可以与 $\zeta^2$ 一同构成新的常数项上界，即
+\[
+\zeta'^2 = \zeta^2 + C。
+\]
+在此意义下，该偏差项仅影响最终的误差上界，而不会改变主定理中的渐进收敛速率。
+
+\subsection{Proof of Lemma 1 (Bidirectional Error Bound)}
+\label{subsec:sup_lemma1}
+本引理的核心目标是证明双向 Top-$k$ 截断所产生的残差不会随通信轮次的发散。首先，利用 Top-$k$ 算子收缩性质，并引入杨氏不等式，将本轮局部聚合梯度的能量与历史累积误差的能量成功解耦；随后，将该递归关系沿通信轮次向下展开，利用无穷等比数列求和的性质消去轮次依赖。
+
+\textbf{1. 客户端上行链路误差推导}
+
+我们先证客户端上行链路的误差缓冲 $e_{t,k}^{up}$。
+首先推导客户端上行链路误差缓冲$e_{t,k}^{up}$，并给出其期望平方范数的上界。设在第 $t$ 轮本地更新结束后，第 $k$ 个客户端准备上传的聚合梯度为 $g_{t,k}$。根据误差补偿机制的更新规则，待压缩的稠密张量为：
+\begin{equation}
+    u_{t,k}^{up} = \eta_t g_{t,k} + e_{t-1,k}^{up}
+\end{equation}
+根据假设 5 中压缩算子的收缩性，压缩后的截断误差满足：
+\begin{equation}
+    \|e_{t,k}^{up}\|^2 = \|u_{t,k}^{up} - \mathcal{C}_{up}(u_{t,k}^{up})\|^2 \le (1-\delta_{up})\|u_{t,k}^{up}\|^2
+\end{equation}
+将 $u_{t,k}^{up}$ 的定义代入上式，并求数学期望：
+\begin{equation}
+    \mathbb{E}\|e_{t,k}^{up}\|^2 \le (1-\delta_{up})\mathbb{E}\|\eta_t g_{t,k} + e_{t-1,k}^{up}\|^2
+\end{equation}
+对于右侧的平方项，我们引入带参数 $\gamma$ 的杨氏不等式 $|a+b|^2 \le (1+\gamma)|a|^2 + (1+\gamma^{-1})|b|^2, \gamma>0$。令 $a=e_{t-1,k}^{up}, b=\eta_t g_{t,k}$，并选取参数 $\gamma = \frac{\delta_{up}}{2}$，我们得到：
+\begin{equation}
+    \mathbb{E}\|e_{t,k}^{up}\|^2 \le (1-\delta_{up}) \left[ \left(1+\frac{\delta_{up}}{2}\right)\mathbb{E}\|e_{t-1,k}^{up}\|^2 + \left(1+\frac{2}{\delta_{up}}\right)\eta_t^2\mathbb{E}\|g_{t,k}\|^2 \right]
+\end{equation}
+注意到常数项的化简满足：
+\begin{equation}
+    (1-\delta_{up})\left(1+\frac{\delta_{up}}{2}\right) = 1-\frac{\delta_{up}}{2}-\frac{\delta_{up}^2}{2} \le 1-\frac{\delta_{up}}{2}
+\end{equation}
+不等式可以简化为：
+\begin{equation}
+    \mathbb{E}\|e_{t,k}^{up}\|^2 \le \left(1-\frac{\delta_{up}}{2}\right)\mathbb{E}\|e_{t-1,k}^{up}\|^2 + (1-\delta_{up})\left(1+\frac{2}{\delta_{up}}\right)\eta_t^2\mathbb{E}\|g_{t,k}\|^2
+\end{equation}
+根据假设 3，单步随机梯度二阶矩有界 $\mathbb{E}\|g_k\|^2 \le G^2$。第 $k$ 个客户端在 $E$ 步本地迭代中累加的等效聚合梯度 $g_{t,k} = \sum_{e=1}^E g_{k,e}$，根据柯西-施瓦茨不等式，其二阶矩满足：
+\begin{equation}
+    \mathbb{E}\|g_{t,k}\|^2 = \mathbb{E}\left\|\sum_{e=1}^E g_{k,e}\right\|^2 \le E \sum_{e=1}^E \mathbb{E}\|g_{k,e}\|^2 \le E^2 G^2
+\end{equation}
+我们将该递归式从第 $t$ 轮一直向下展开至初始误差 $e_{0,k}^{up}=0$ 的第 0 轮：
+\begin{equation}
+    \mathbb{E}\|e_{t,k}^{up}\|^2 \le \sum_{j=1}^t \left(1-\frac{\delta_{up}}{2}\right)^{t-j} (1-\delta_{up})\left(1+\frac{2}{\delta_{up}}\right)\eta_j^2 E^2 G^2
+\end{equation}
+利用无穷等比数列求和公式 $\sum_{i=0}^\infty (1-\frac{\delta_{up}}{2})^i = \frac{1}{\delta_{up}/2} = \frac{2}{\delta_{up}}$，在常数（或单调递减）学习率下，可得上界：
+\begin{equation}
+    \mathbb{E}\|e_{t,k}^{up}\|^2 \le \frac{1-\delta_{up}}{\delta_{up}^2} \cdot 2(\delta_{up}+2)\eta_t^2 E^2 G^2
+\end{equation}
+令常数 $C_2 = 2(\delta_{up} + 2)$，对所有 $K$ 个客户端进行加权求和，利用 $\sum_{k=1}^K p_k = 1$ 的性质得：
+\begin{equation}
+    \sum_{k=1}^K p_k \mathbb{E}\|e_{t,k}^{up}\|^2 \le \frac{1-\delta_{up}}{\delta_{up}^2} C_2 \eta_t^2 E^2 G^2
+\end{equation}
+上行链路证毕。
+
+\textbf{2. 服务器端下行链路误差推导}
+
+在真实系统的执行中，如 \textbf{Algorithm 2} 所示，服务器下行链路的补偿与压缩对象，并非理想的无压缩梯度，而是客户端上传的压缩残差的聚合。设 $S_t$ 为采样大小为 $m$ 的活跃客户端集合，服务器端聚合的物理更新量为 $\Delta w_t = \frac{1}{m}\sum_{k \in S_t} c_{t,k}^{up}$。
+服务器端的无压缩稠密更新量，即下行补偿向量为：
+\begin{equation}
+    u_t^{down} = \Delta w_t + e_{t-1}^{down}
+\end{equation}
+
+为了界定 $\mathbb{E}\|u_t^{down}\|^2$，我们首先需要界定物理聚合量 $\mathbb{E}\|\Delta w_t\|^2$。应用基于凸函数的 Jensen 不等式可得：
+\begin{equation}
+    \mathbb{E}\|\Delta w_t\|^2 = \mathbb{E}\left\|\frac{1}{m}\sum_{k \in S_t} c_{t,k}^{up}\right\|^2 \le \frac{1}{m}\sum_{k \in S_t} \mathbb{E}\|c_{t,k}^{up}\|^2
+\end{equation}
+由于 Top-$k$ 压缩算子通过硬截断保留绝对值最大的元素，其输出的范数必然不大于输入范数，即 $\|c_{t,k}^{up}\|^2 = \|\mathcal{C}_{up}(u_{t,k}^{up})\|^2 \le \|u_{t,k}^{up}\|^2$。
+结合上行链路中的补偿定义 $u_{t,k}^{up} = -\eta_t g_{t,k} + e_{t-1,k}^{up}$，应用带参数 $1$ 的杨氏不等式：
+\begin{equation}
+    \mathbb{E}\|c_{t,k}^{up}\|^2 \le \mathbb{E}\|u_{t,k}^{up}\|^2 \le 2\eta_t^2\mathbb{E}\|g_{t,k}\|^2 + 2\mathbb{E}\|e_{t-1,k}^{up}\|^2
+\end{equation}
+代入前文得出的本地梯度边界 $\mathbb{E}\|g_{t,k}\|^2 \le E^2 G^2$ 以及上行误差边界 $\mathbb{E}\|e_{t-1,k}^{up}\|^2 \le \frac{1-\delta_{up}}{\delta_{up}^2} C_2 \eta_{t-1}^2 E^2 G^2$。在常数或平缓衰减学习率的假设下，我们可以将 $\mathbb{E}\|\Delta w_t\|^2$ 统一界定为：
+\begin{equation}
+    \mathbb{E}\|\Delta w_t\|^2 \le 2\left(1 + \frac{1-\delta_{up}}{\delta_{up}^2} C_2 \right) \eta_t^2 E^2 G^2 \triangleq C_{agg} \eta_t^2 E^2 G^2
+\end{equation}
+其中 $C_{agg}$ 为由上行压缩特性决定的常数边界。这表明上行压缩噪音注入系统后，其能量依然受限于同量级的常数内。
+
+接下来，我们对下行误差缓冲 $e_t^{down}$ 进行收缩性推导。结合假设 5 中下行压缩算子的收缩性：
+\begin{equation}
+    \|e_t^{down}\|^2 = \|u_t^{down} - \mathcal{C}_{down}(u_t^{down})\|^2 \le (1-\delta_{down})\|u_t^{down}\|^2
+\end{equation}
+代入 $u_t^{down} = \Delta w_t + e_{t-1}^{down}$ 并对两边求期望，应用带参数 $\gamma = \frac{\delta_{down}}{2}$ 的杨氏不等式：
+\begin{equation}
+    \mathbb{E}\|e_t^{down}\|^2 \le (1-\delta_{down}) \left[ \left(1+\frac{\delta_{down}}{2}\right)\mathbb{E}\|e_{t-1}^{down}\|^2 + \left(1+\frac{2}{\delta_{down}}\right)\mathbb{E}\|\Delta w_t\|^2 \right]
+\end{equation}
+利用常数项化简 $(1-\delta_{down})\left(1+\frac{\delta_{down}}{2}\right) \le 1-\frac{\delta_{down}}{2}$，并代入 $\mathbb{E}\|\Delta w_t\|^2$ 的上界 $C_{agg} \eta_t^2 E^2 G^2$：
+\begin{equation}
+    \mathbb{E}\|e_t^{down}\|^2 \le \left(1-\frac{\delta_{down}}{2}\right)\mathbb{E}\|e_{t-1}^{down}\|^2 + (1-\delta_{down})\left(1+\frac{2}{\delta_{down}}\right) C_{agg} \eta_t^2 E^2 G^2
+\end{equation}
+将该递归式从第 $t$ 轮向下展开至第 0 轮，并利用无穷等比数列求和 $\sum_{i=0}^\infty (1-\frac{\delta_{down}}{2})^i = \frac{2}{\delta_{down}}$，可得下行误差的严格上界：
+\begin{equation}
+    \mathbb{E}\|e_t^{down}\|^2 \le \frac{1-\delta_{down}}{\delta_{down}^2} \cdot 2(\delta_{down}+2) C_{agg} \eta_t^2 E^2 G^2
+\end{equation}
+定义常数 $C_1 = 2(\delta_{down} + 2)C_{agg}$，即得服务器端下行误差缓冲的理论上限：
+\begin{equation}
+    \mathbb{E}\|e_t^{down}\|^2 \le \frac{1-\delta_{down}}{\delta_{down}^2} C_1 \eta_t^2 E^2 G^2
+\end{equation}
+引理 1 得证。
+
+\subsection{Proof of Lemma 2 (Descent Lemma)}
+\label{subsec:sup_lemma2}
+为了精准刻画系统在部分客户端参与下的收敛动力学，本证明分为三步。
+
+\textbf{步骤 1: 全局聚合梯度的期望与方差正交分解}
+
+在第 $t$ 轮中，服务器无放回地均匀随机采样 $m$ 个客户端构成活跃集合 $S_t$，虚拟模型 $\tilde{w}_t$ 的单步演化遵循由该采样集产生的等效全局未压缩梯度 $g_t$ 的驱动：$\tilde{w}_{t+1} = \tilde{w}_t - \eta_t g_t$。这里 $g_t = \frac{1}{m}\sum_{k \in S_t}\sum_{e=1}^E g_{k,e}$，其中 $g_{k,e} \triangleq g_k(w_{t,k,e-1}; \xi_{t,k,e})$。
+
+对 $g_t$ 求关于数据抽样 $\xi$ 与客户端采样 $S_t$ 的全期望，由假设 3 可得全局期望演化方向为所有客户端本地真实梯度的平均：
+\begin{equation}
+    \mathbb{E}[g_t] = \mathbb{E}_{S_t}\left[\mathbb{E}_\xi\left[\frac{1}{m}\sum_{k \in S_t}\sum_{e=1}^E g_{k,e}\right]\right] = \frac{1}{K}\sum_{k=1}^K\sum_{e=1}^E \nabla F_k(w_{t,k,e-1})
+\end{equation}
+接下来，我们需要界定 $g_t$ 的二阶矩 $\mathbb{E}\|g_t\|^2$。基于方差分解恒等式 $\mathbb{E}\|X\|^2 = \|\mathbb{E}X\|^2 + Var(X)$，并利用全方差公式，我们可以将全局梯度的方差正交拆解为本地数据抽样内部噪声与客户端间异质性抽样噪声：
+\begin{equation}
+    \mathbb{E}\|g_t\|^2 = \|\mathbb{E}[g_t]\|^2 + \mathbb{E}_{S_t}[Var_\xi(g_t | S_t)] + Var_{S_t}(\mathbb{E}_\xi[g_t | S_t])
+\end{equation}
+
+上式第二项是数据抽样方差。根据假设 3 中内部方差有界性以及各本地小批量抽样间的独立性可得：
+\begin{equation}
+    \mathbb{E}_{S_t}[Var_\xi(g_t | S_t)] = \mathbb{E}_{S_t}\left[\frac{1}{m^2}\sum_{k \in S_t}\sum_{e=1}^E \mathbb{E}_\xi\|g_{k,e} - \nabla F_k(w_{t,k,e-1})\|^2\right] \le \frac{E\sigma^2}{m}
+\end{equation}
+
+第三项是客户端抽样方差。设本地真实累加梯度为 $\Delta_k = \sum_{e=1}^E \nabla F_k(w_{t,k,e-1})$。
+其中 $\nabla F_k(\cdot)$ 表示客户端 $k$ 在其全量数据集 $\mathcal{D}_k$ 上计算得到的真实梯度，不含抽样噪声。因而 $\Delta_k$ 刻画了客户端在 $E$ 步本地迭代过程中，若每一步均使用全量数据计算梯度时所得到的累积方向。
+
+基于有限总体无放回抽样的经典方差统计公式可得：
+\begin{equation}
+    Var_{S_t}\left(\frac{1}{m}\sum_{k \in S_t}\Delta_k\right) = \frac{K-m}{m(K-1)}\left(\frac{1}{K}\sum_{k=1}^K\|\Delta_k - \mathbb{E}[g_t]\|^2\right)
+\end{equation}
+
+为统一后续计算，我们首先利用方差放缩不等式 $\frac{1}{K}\sum_{k=1}^K\|x_k - \bar{x}\|^2 \le \frac{1}{K}\sum_{k=1}^K\|x_k\|^2$ 放除均值项：
+\begin{equation}
+    Var_{S_t}\left(\frac{1}{m}\sum_{k \in S_t}\Delta_k\right) \le \frac{K-m}{m(K-1)}\left(\frac{1}{K}\sum_{k=1}^K\|\Delta_k\|^2\right)
+\end{equation}
+
+接着，代入 $\Delta_k$ 的定义，并对本地 $E$ 步累加和应用柯西-施瓦茨不等式：
+\begin{equation}
+    \|\Delta_k\|^2 = \left\|\sum_{e=1}^E \nabla F_k(w_{t,k,e-1})\right\|^2 \le E \sum_{e=1}^E \|\nabla F_k(w_{t,k,e-1})\|^2
+\end{equation}
+
+将上述两步放缩结果代回总的二阶矩分解式中，即可得到最终的二阶矩上限：
+\begin{equation}
+    \mathbb{E}\|g_t\|^2 \le \|\mathbb{E}[g_t]\|^2 + \frac{E\sigma^2}{m} + \frac{K-m}{m(K-1)}\left(\frac{E}{K}\sum_{k=1}^K\sum_{e=1}^E\|\nabla F_k(w_{t,k,e-1})\|^2\right)
+\end{equation}
+
+从此式可以看出增大单轮采样数 $m$，不仅能够以 $1/m$ 的速率缩减本地随机噪声，还能有效压制因系统 Non-IID 带来的结构性采样偏移。
+
+\textbf{步骤 2: 基于 L-平滑性的下降上界}
+
+根据假设 1 全局目标函数的 L-平滑性，我们在虚拟序列当前点 $\tilde{w}_t$ 处进行上界放缩：
+\begin{equation}
+    F(\tilde{w}_{t+1}) \le F(\tilde{w}_t) + \langle \nabla F(\tilde{w}_t), \tilde{w}_{t+1} - \tilde{w}_t \rangle + \frac{L}{2}\|\tilde{w}_{t+1} - \tilde{w}_t\|^2
+\end{equation}
+
+代入虚拟序列更新式 $\tilde{w}_{t+1} - \tilde{w}_t = -\eta_t g_t$，并对当前轮次中所有的局部数据抽样与客户端采样随机性求全期望：
+\begin{equation}
+    \mathbb{E}_t[F(\tilde{w}_{t+1})] \le F(\tilde{w}_t) - \eta_t\langle \nabla F(\tilde{w}_t), \mathbb{E}_t[g_t] \rangle + \frac{\eta_t^2 L}{2}\mathbb{E}_t\|g_t\|^2
+\end{equation}
+
+\textbf{步骤 3: 期望项的解耦与代入放缩}
+
+利用恒等式 $-\langle a,b \rangle = \frac{1}{2}\|a-b\|^2 - \frac{1}{2}\|a\|^2 - \frac{1}{2}\|b\|^2$，并将 $\mathbb{E}[g_t]$ 代入内积部分将其解耦：
+\begin{equation}
+    -\eta_t\langle \nabla F(\tilde{w}_t), \mathbb{E}[g_t] \rangle = \frac{\eta_t}{2K}\sum_{k=1}^K\sum_{e=1}^E \left(\|\nabla F(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2 - \|\nabla F(\tilde{w}_t)\|^2 - \|\nabla F_k(w_{t,k,e-1})\|^2\right)
+\end{equation}
+其中，$-\frac{\eta_t E}{2}\|\nabla F(\tilde{w}_t)\|^2$ 正是驱动全局目标函数下降的核心负梯度项。
+将第一步求得的二阶矩上界与内积项等价形式代回泰勒展开式中，并合并包含 $\|\nabla F_k(w_{t,k,e-1})\|^2$ 的同类项，得到单步演化边界如下：
+\begin{equation}
+\begin{aligned}
+    \mathbb{E}[F(\tilde{w}_{t+1})] \le & \mathbb{E}[F(\tilde{w}_t)] - \frac{\eta_t E}{2}\|\nabla F(\tilde{w}_t)\|^2 + \frac{\eta_t^2 L E \sigma^2}{2m} + \frac{\eta_t}{2K}\sum_{k=1}^K\sum_{e=1}^E \|\nabla F(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2 \\
+    & + \left(\frac{\eta_t^2 L E}{2}\frac{K-m}{m(K-1)} - \frac{\eta_t}{2}\right)\frac{1}{K}\sum_{k=1}^K\sum_{e=1}^E \|\nabla F_k(w_{t,k,e-1})\|^2
+\end{aligned}
+\end{equation}
+为确保优化过程稳定收敛，我们引入有效学习率约束条件。只要当前学习率满足 $\eta_t \le \frac{m(K-1)}{EL(K-m)}$，上述最后一项的系数即为非正，可舍弃。由于 $\frac{m(K-1)}{K-m} \ge 1$，约束 $\eta_t \le \frac{1}{EL}$ 依然是充分条件。
+
+最后，界定上式中残留的交叉差异项 $\|\nabla F(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2$。引入 $\nabla F_k(\tilde{w}_t)$ 作为桥梁，应用带参数为 1 的杨氏不等式进行拆解：
+\begin{equation}
+    \|\nabla F(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2 \le 2\|\nabla F(\tilde{w}_t) - \nabla F_k(\tilde{w}_t)\|^2 + 2\|\nabla F_k(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2
+\end{equation}
+对上式右侧第一项求全客户端均值，由假设 4 数据异质性边界可知其受限于 $\zeta^2$。
+对于右侧第二项，应用假设 1 的 L-平滑性映射至参数空间。根据我们提出的状态对齐机制，所有客户端在每轮训练伊始均被强制重置并从统一的物理同步模型 $w_t^{sync}$ 出发。显式引入 $w_t^{sync}$ 并应用杨氏不等式可得：
+\begin{equation}
+    2\|\nabla F_k(\tilde{w}_t) - \nabla F_k(w_{t,k,e-1})\|^2 \le 2L^2\|\tilde{w}_t - w_{t,k,e-1}\|^2 \le 4L^2\|\tilde{w}_t - w_t^{sync}\|^2 + 4L^2\|w_t^{sync} - w_{t,k,e-1}\|^2
+\end{equation}
+综合以上剥离过程，代回期望边界后，得到虚拟序列最终的下降引理：
+\begin{equation}
+\begin{aligned}
+    \mathbb{E}[F(\tilde{w}_{t+1})] \le & \mathbb{E}[F(\tilde{w}_t)] - \frac{\eta_t E}{2}\mathbb{E}\|\nabla F(\tilde{w}_t)\|^2 + \frac{\eta_t^2 L^2 E \sigma^2}{m} + \eta_t E \zeta^2 \\
+    & + 2\eta_t E L^2 \mathbb{E}\|\tilde{w}_t - w_t^{sync}\|^2 + \frac{2\eta_t L^2}{K}\sum_{k=1}^K\sum_{e=1}^E \mathbb{E}\|w_t^{sync} - w_{t,k,e-1}\|^2
+\end{aligned}
+\end{equation}
+引理 2 证毕。
+
+\subsection{Proof of Main Convergence Theorem}
+\label{subsec:sup_main_theorem}
+本节将基于引理 1 与引理 2，推导算法在非凸目标下的全局收敛率。
+
+\textbf{1. 客户端漂移的界定}
+
+对引理 2 中的客户端漂移项进行分析。在本地训练中，第 $k$ 个客户端在第 $e-1$ 步的模型是由同步模型 $w_t^{sync}$ 经过 $e-1$ 步累加而成：$w_{t,k,e-1} - w_t^{sync} = -\eta_t \sum_{j=1}^{e-1} g_{k,j}$。
+取平方范数与期望，应用柯西-施瓦茨不等式及二阶矩有界性：
+\begin{equation}
+    \mathbb{E}\|w_{t,k,e-1} - w_t^{sync}\|^2 \le \eta_t^2 (e-1) \sum_{j=1}^{e-1} \mathbb{E}\|g_{k,j}\|^2 \le \eta_t^2 (e-1)^2 G^2 \le \eta_t^2 E^2 G^2
+\end{equation}
+对所有本地步数 $E$ 累加，再对全体客户端求均值，得到系统累计客户端漂移上界：
+\begin{equation}
+    \frac{2\eta_t L^2}{K} \sum_{k=1}^K\sum_{e=1}^E \mathbb{E}\|w_t^{sync} - w_{t,k,e-1}\|^2 \le 2\eta_t L^2 (E \cdot \eta_t^2 E^2 G^2) = 2L^2 G^2 E^3 \eta_t^3
+\end{equation}
+
+\textbf{2. 界定双向压缩惩罚}
+
+本框架引入了显式的状态对齐机制，客户端在本地训练开始前的起始参数 $w_{t,k}^0$ 被重置为同步模型 $w_t^{sync}$。因此，引理 2 中的参数偏差 $\mathbb{E}\|\tilde{w}_t - w_t^{sync}\|^2$ 等价于我们在\ref{subsec:sup_sync_proof}定义中的初始化漂移 $D_{t,k} \triangleq \mathbb{E}\|w_{t,k}^0 - \tilde{w}_t\|^2$。
+
+结合引理 1 的双向误差边界结论，该漂移项被收缩并约束为：
+\begin{equation}
+    \mathbb{E}\|\tilde{w}_t - w_t^{sync}\|^2 = D_{t,k} \le C_c \cdot \eta_t^2 E^2 G^2
+\end{equation}
+其中，压缩常数 $C_c \triangleq 2\frac{1-\delta_{down}}{\delta_{down}^2}C_1 + 2\frac{1-\delta_{up}}{\delta_{up}^2}C_2$。将其代入惩罚项中得：
+\begin{equation}
+    2\eta_t E L^2 \mathbb{E}\|\tilde{w}_t - w_t^{sync}\|^2 \le 2C_c L^2 G^2 E^3 \eta_t^3
+\end{equation}
+
+\textbf{3. 全局累加与最优化学习率设定}
+
+将上述两项 $\mathcal{O}(\eta_t^3)$ 级别的高阶误差同步代回引理 2，并定义合并常数 $\Gamma = 2C_c + 2$：
+\begin{equation}
+    \mathbb{E}[F(\tilde{w}_{t+1})] \le \mathbb{E}[F(\tilde{w}_t)] - \frac{\eta_t E}{2}\mathbb{E}\|\nabla F(\tilde{w}_t)\|^2 + \frac{\eta_t^2 L E \sigma^2}{2m} + \eta_t E \zeta^2 + \Gamma L^2 G^2 E^3 \eta_t^3
+\end{equation}
+采用恒定学习率策略 $\eta_t = \eta \le \frac{1}{EL}$，对时间步 $t=1$ 到 $T$ 进行累加，利用目标函数下界 $F_{inf}$ 将左侧首尾相消项放缩为 $\Delta \triangleq F(\tilde{w}_1) - F_{inf}$，得到：
+\begin{equation}
+    \frac{\eta E}{2} \sum_{t=1}^T \mathbb{E}\|\nabla F(\tilde{w}_t)\|^2 \le \Delta + \frac{\eta^2 L E T \sigma^2}{2m} + \eta E T \zeta^2 + \Gamma L^2 G^2 E^3 T \eta^3
+\end{equation}
+等式两边同除以有效更新步数 $\frac{\eta E T}{2}$，得到平均梯度范数平方的上界：
+\begin{equation}
+    \frac{1}{T} \sum_{t=1}^T \mathbb{E}\|\nabla F(\tilde{w}_t)\|^2 \le \frac{2\Delta}{\eta E T} + \frac{\eta L \sigma^2}{m} + 2\zeta^2 + 2\Gamma L^2 G^2 E^2 \eta^2
+\end{equation}
+为了最小化该收敛上界中由系统规模决定的主导项，我们令全局学习率设定为 $\eta = \mathcal{O}\left(\sqrt{\frac{m}{ET}}\right)$。将其代入上式，可得算法最终的收敛渐进率：
+\begin{equation}
+    \frac{1}{T} \sum_{t=1}^T \mathbb{E}\|\nabla F(\tilde{w}_t)\|^2 \le \underbrace{\mathcal{O}\left(\frac{\sigma}{\sqrt{mET}}\right)}_{\text{linear variance reduction}} + \underbrace{2\zeta^2}_{\text{heterogeneity lower bound}} + \underbrace{\mathcal{O}\left(\frac{mE}{T}\right)}_{\text{compression and drift error}}
+\end{equation}
+上述结果证明了：当系统采样规模 $m$ 增大时，主导优化轨迹的随机数据抽样噪声以 $1/\sqrt{m}$ 的速率呈现线性加速比；由双向强力压缩与多步本地更新引入的附加惩罚项被限制在 $\mathcal{O}(mE/T)$ 的量级。由于 $\mathcal{O}(1/T)$ 的衰减速率严格快于主导项 $\mathcal{O}(1/\sqrt{T})$，这意味着当通信轮次 $T$ 足够大时，高阶项将迅速收敛并被主导项吸收，从而从理论上保障了与全精度分布式 SGD 相同的渐进收敛性质。
+
+\subsection{Theoretical Proof on the Necessity of State Synchronization}
+\label{subsec:sup_sync_proof}
+
+受经典联邦方差缩减算法 SCAFFOLD 中对客户端漂移理论框架的启发，我们定义并界定初始化漂移 $D_{t,k} \triangleq \mathbb{E}\|w_{t,k}^0 - \tilde{w}_t\|^2$ 的上界。在传统的无压缩或单向压缩联邦学习中，客户端的本地起点通常被假定与全局模型完全一致。但在引入高压缩率的双向压缩条件下，该漂移项精确刻画了受截断误差影响的物理系统实际起点与理想无损的全局虚拟状态之间的初始代数偏差。
+
+\subsubsection{Drift Contraction with State Alignment (BiSARC)}
+本节证明在 Sync 机制下，客户端初始化漂移 $D_{t,k}$ 不会发生跨轮次累积。
+根据全局虚拟序列的定义：
+\begin{equation}
+    \tilde{w}_t = w_t^{sync} + e_{t-1}^{down} + \frac{1}{K}\sum_{j=1}^K e_{t-1,j}^{up}
+\end{equation}
+由于采用 Sync 机制，所有客户端在第 $t$ 轮训练开始时强制对齐至物理同步模型，即 $w_{t,k}^0 = w_t^{sync}$。将两者相减，物理模型项抵消：
+\begin{equation}
+    w_{t,k}^0 - \tilde{w}_t = - e_{t-1}^{down} - \frac{1}{K}\sum_{j=1}^K e_{t-1,j}^{up}
+\end{equation}
+对等式两边取平方范数与期望，应用带参数为 1 的杨氏不等式解耦上下行残差，并对上行残差项应用基于凸函数的 Jensen 不等式：
+\begin{equation}
+    D_{t,k} \le 2\mathbb{E}\|e_{t-1}^{down}\|^2 + \frac{2}{K}\sum_{j=1}^K \mathbb{E}\|e_{t-1,j}^{up}\|^2
+\end{equation}
+结合引理 1 引入残差绝对边界，得到：
+\begin{equation}
+    D_{t,k} \le C_c \cdot \eta_{t-1}^2 E^2 G^2
+\end{equation}
+漂移项的上限完全由当轮的学习率与常数构成。Sync 机制切断了本地历史状态的依赖链，随着学习率衰减，残余偏移在每轮都会被进一步压缩，不会发散。
+
+\subsubsection{缺乏状态对齐时的漂移累积分析}
+本节证明如果去除 Sync 机制，初始化漂移将呈现出包含放大因子的自回归特性。
+值得强调的是，现有双向压缩研究大多仅在工程实现层面尝试缓解收敛退化，
+而缺乏针对不对齐场景下漂移发散的显式数学建模与理论分析。
+因此，本节的推导为该问题提供了首次系统性的刻画。
+
+在缺乏显式状态对齐的情况下，客户端 $k$ 在第 $t$ 轮的初始模型 $w_{t,k}^0$ 直接由上一轮训练结束后的模型 $w_{t-1,k}$ 与服务器下行的压缩更新 $c_{t-1}^{down}$ 叠加而成。由于 $w_{t-1,k} = w_{t-1,k}^0 + \Delta w_{t-1,k}^{local}$，其递推式为：
+\begin{equation}
+    w_{t,k}^0 = w_{t-1,k}^0 + \Delta w_{t-1,k}^{local} + c_{t-1}^{down}
+\end{equation}
+
+为了分析物理起点相对于理想状态的偏离，我们考察虚拟序列的演化公式 $\tilde{w}_t = \tilde{w}_{t-1} + \Delta w_{t-1}^{global}$，其中 $\Delta w_{t-1}^{global}$ 为全局无偏更新期望。将物理演化式与虚拟序列演化式相减，得到单客户端漂移项的递推关系：
+\begin{equation}
+    (w_{t,k}^0 - \tilde{w}_t) = \underbrace{(w_{t-1,k}^0 - \tilde{w}_{t-1})}_{\text{历史偏差继承}} + \underbrace{(\Delta w_{t-1,k}^{local} - \Delta w_{t-1}^{global}) + c_{t-1}^{down}}_{\text{本轮引入的增量偏差}}
+\end{equation}
+
+为了界定系统的平均初始化漂移 $D_t \triangleq \frac{1}{K}\sum_{k=1}^K \mathbb{E}\|w_{t,k}^0 - \tilde{w}_t\|^2$，我们对上式应用带参数 $\gamma > 0$ 的杨氏不等式 $\|a+b\|^2 \le (1+\gamma)\|a\|^2 + (1+\frac{1}{\gamma})\|b\|^2$：
+\begin{equation}
+    D_t \le (1+\gamma)D_{t-1} + \left(1+\frac{1}{\gamma}\right)\frac{1}{K}\sum_{k=1}^K \mathbb{E}\|\Delta w_{t-1,k}^{local} - \Delta w_{t-1}^{global} + c_{t-1}^{down}\|^2
+\end{equation}
+
+对于右侧的复合增量项，我们再次应用杨氏不等式将其正交拆解为表示客户端异构漂移的 $\text{Term I}$ 和表示下行压缩扰动的 $\text{Term II}$：
+\begin{equation}
+    \frac{1}{K}\sum_{k=1}^K \mathbb{E}\|\Delta w_{t-1,k}^{local} - \Delta w_{t-1}^{global} + c_{t-1}^{down}\|^2 \le \underbrace{\frac{2}{K}\sum_{k=1}^K \mathbb{E}\|\Delta w_{t-1,k}^{local} - \Delta w_{t-1}^{global}\|^2}_{\text{Term I}} + \underbrace{2\mathbb{E}\|c_{t-1}^{down}\|^2}_{\text{Term II}}
+\end{equation}
+
+\textbf{对 Term I 的界定：} 
+首先，将本地更新与全局更新的定义代入 $\text{Term I}$ 中：
+\begin{equation}
+    \text{Term I} = \frac{2}{K}\sum_{k=1}^K \mathbb{E}\left\| -\eta_{t-1}\sum_{e=1}^E g_{t-1,k,e} - \left(-\eta_{t-1}\frac{1}{K}\sum_{j=1}^K\sum_{e=1}^E g_{t-1,j,e}\right) \right\|^2
+\end{equation}
+提取公因式 $-\eta_{t-1}$，并令单步的全局平均梯度为 $g_{t-1,e} = \frac{1}{K}\sum_{j=1}^K g_{t-1,j,e}$，上式可重写为：
+\begin{equation}
+    \text{Term I} = 2\eta_{t-1}^2 \frac{1}{K}\sum_{k=1}^K \mathbb{E}\left\| \sum_{e=1}^E (g_{t-1,k,e} - g_{t-1,e}) \right\|^2
+\end{equation}
+
+接着，由于范数内部存在 $E$ 步的连续累加，我们对其应用柯西-施瓦茨不等式（$\|\sum_{i=1}^n x_i\|^2 \le n\sum_{i=1}^n \|x_i\|^2$），将求和符号提出平方项外：
+\begin{equation}
+    \text{Term I} \le 2\eta_{t-1}^2 E \sum_{e=1}^E \left( \frac{1}{K}\sum_{k=1}^K \mathbb{E}\|g_{t-1,k,e} - g_{t-1,e}\|^2 \right)
+\end{equation}
+
+随后，我们对括号内的单步梯度差异进行正交分解。将局部随机梯度分解为真实梯度与均值为 0 的随机抽样噪声，即 $g = \nabla F + \xi$，则有：
+\begin{equation}
+    g_{t-1,k,e} - g_{t-1,e} = \left(\nabla F_k - \frac{1}{K}\sum_{j=1}^K \nabla F_j\right) + (\xi_{t-1,k,e} - \xi_{t-1,e})
+\end{equation}
+由于真实梯度与零均值随机噪声相互独立，其交叉项的期望为零，方差可直接正交拆解：
+\begin{equation}
+    \mathbb{E}\|g_{t-1,k,e} - g_{t-1,e}\|^2 = \left\|\nabla F_k - \frac{1}{K}\sum_{j=1}^K \nabla F_j\right\|^2 + \mathbb{E}\|\xi_{t-1,k,e} - \xi_{t-1,e}\|^2
+\end{equation}
+
+对全体客户端 $K$ 求均值，并利用方差放缩不等式 $\frac{1}{K}\sum\|\xi_k - \bar{\xi}\|^2 \le \frac{1}{K}\sum\|\xi_k\|^2$ 放除均值噪声项：
+\begin{equation}
+    \frac{1}{K}\sum_{k=1}^K \mathbb{E}\|g_{t-1,k,e} - g_{t-1,e}\|^2 \le \underbrace{\frac{1}{K}\sum_{k=1}^K \|\nabla F_k - \nabla F\|^2}_{\le \zeta^2 (\text{假设 4})} + \underbrace{\frac{1}{K}\sum_{k=1}^K \mathbb{E}\|\xi_{t-1,k,e}\|^2}_{\le \sigma^2 (\text{假设 3})} \le \zeta^2 + \sigma^2
+\end{equation}
+其中 $\zeta^2$ 为假设 4 定义的数据异质性边界，$\sigma^2$ 为假设 3 定义的局部抽样内部方差。
+
+最后，将该单步方差的严密边界代回 $\text{Term I}$ 的放缩式中，对外层的 $E$ 步求和，得到最终界限：
+\begin{equation}
+    \text{Term I} \le 2\eta_{t-1}^2 E \sum_{e=1}^E (\zeta^2 + \sigma^2) = 2\eta_{t-1}^2 E^2 (\zeta^2 + \sigma^2)
+\end{equation}
+
+\textbf{对 Term II 的界定：} 基于 Top-$k$ 算子的收缩性 $\|Cx\|^2 \le \|x\|^2$，结合引理 1 中对下行补偿向量 $u_{t-1}^{down}$ 的有界性证明：
+\begin{equation}
+    \text{Term II} = 2\mathbb{E}\|\mathcal{C}_{down}(u_{t-1}^{down})\|^2 \le 2\mathbb{E}\|u_{t-1}^{down}\|^2 \le C_{down}\eta_{t-1}^2 E^2 G^2
+\end{equation}
+
+将上述界限代回，定义合并常数 $A \triangleq 2(1+\frac{1}{\gamma})$ 与 $C_p \triangleq (1+\frac{1}{\gamma})C_{down}$，我们得到最终的递归上界：
+\begin{equation}
+    D_t \le (1+\gamma)D_{t-1} + A\eta_{t-1}^2 E^2 (\zeta^2 + \sigma^2) + C_p \eta_{t-1}^2 E^2 G^2
+\end{equation}
+
+由于递推式中包含放大因子 $(1+\gamma) > 1$，系统缺乏能够抑制历史偏移 $D_{t-1}$ 的结构性收缩项。在 Non-IID 场景下，空间差异 $\zeta^2$ 在每轮均会重新注入系统并呈现自回归式放大，导致收敛性边界崩溃。这也从理论上完美解释了主文实验中移除 Sync 机制后观测到的初始化漂移发散现象。
+
+
+% ==========================================
+% S.III 补充实验与系统级分析
+% ==========================================
+\section{Additional Experimental Results and System Benchmarks}
+\label{sec:sup_experiments}
+
+\subsection{Hyperparameter Sensitivity Analysis}
+\label{subsec:sup_hyperparameters}
+
+表 \ref{tab:compression_ratio} 展示了压缩率 $\rho$ 对性能的影响。结果表明，适度的稀疏化截断起到了类似权重衰减的隐式正则化作用。在极端异质性下，Top-$k$ 算子滤除了局部过拟合带来的噪声，在维持精度的同时提升了泛化表现。
+
+\begin{table}[htbp]
+\centering
+\caption{不同压缩率 $\rho$ 下的测试准确率 (\%)}
+\label{tab:compression_ratio}
+\begin{tabular}{llcccccc}
+\toprule
+\textbf{Dataset} & \textbf{Heterogeneity} & $\rho=0.1$ & $\rho=0.2$ & $\rho=0.4$ & $\rho=0.6$ & $\rho=0.8$ & \textbf{FedProx (Dense)} \\
+\midrule
+\multirow{2}{*}{CIFAR-10} 
+ & $\alpha = 0.5$ & 70.52 & 72.27 & 74.24 & 74.65 & 74.67 & 73.00 \\
+ & $\alpha = 0.1$ & 49.69 & 53.38 & 53.54 & 53.09 & 53.54 & 52.06 \\
+\midrule
+\multirow{2}{*}{CIFAR-100} 
+ & $\alpha = 0.5$ & 34.78 & 38.74 & 39.61 & 40.31 & 40.47 & 40.65 \\
+ & $\alpha = 0.1$ & 29.26 & 32.86 & 33.71 & 34.28 & 34.35 & 32.79 \\
+\midrule
+Shakespeare & Natural Partition & 51.63 & 52.32 & 52.59 & 52.76 & 52.68 & 52.78 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+表 \ref{tab:learning_rate} 展示了固定压缩率为 10\% 时，初始学习率与误差反馈（EF）模块的联合影响。结果表明，无论学习率大小，误差反馈机制对于缓解截断带来的性能损失均具备必要性。
+
+\begin{table}[htbp]
+\centering
+\caption{在 CIFAR-100 上不同学习率 (lr) 与误差反馈 (ef) 的测试精度 (\%)}
+\label{tab:learning_rate}
+\begin{tabular}{cccccc}
+\toprule
+\multirow{2}{*}{\textbf{Error Feedback (ef)}} & \multicolumn{5}{c}{\textbf{Learning Rate (lr)}} \\
+\cmidrule{2-6}
+ & 0.001 & 0.005 & 0.01 & 0.05 & 0.1 \\
+\midrule
+1 (With EF) & 10.90 & 23.98 & 34.78 & 33.18 & 29.66 \\
+0 (Without EF) & 7.77 & 10.95 & 14.72 & 10.00 & 7.81 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{In-depth Analysis of End-to-End Codec Latency}
+\label{subsec:sup_codec_latency}
+
+为全面评估位级打包机制在实际系统中的端到端编解码延迟，我们构建了算子级微基准测试。测试覆盖了从约 4.2M 参数的 LLaMA-7B LoRA 微调负载到 86M 参数的 ViT-Base 模型。测试在 PyTorch 动态图环境和 TensorFlow/XLA 静态图编译环境中分别进行，以深入对比不同算子调度机制下各压缩算法的底层表现。完整耗时结果详见表 \ref{tab:codec_latency}。
+
+\subsubsection{Experimental Setup}
+实验硬件为单张 RTX 3090 (24GB) GPU 和 14 核 Intel Xeon CPU。每个配置先进行 15 次预热以稳定 GPU 时钟与显存状态，随后连续测量 100 次取平均值作为端到端延迟，并在计时范围内插入显式的主机-设备同步。
+在基于通用张量框架的实现中，部分依赖逐比特处理的算法难以被高效向量化。为保证对比的公平性与可行性，我们进行了必要的近似处理：(1) \textbf{QSGD} 省略了难以并行的 Elias 编码，仅保留量化与基于 \texttt{where} 的动态稀疏化步骤，但动态稀疏化的开销已能反映其在静态图中的编译限制；(2) \textbf{FetchSGD} 采用原生 \texttt{gather}/\texttt{scatter} 替代定制的 Hash 算子，以反映其不规则访存特性；(3) \textbf{STC} 的 Golomb 解码采用原生循环实现，以直接暴露其在 GPU 架构下的串行控制流瓶颈，且因其无法静态化而在 TensorFlow/XLA 测试中被省略。
+
+\subsubsection{Efficiency in Dynamic Graph (PyTorch)}
+在动态图条件下，框架对动态形状的处理机制主导了延迟表现。实验显示，STC 的变长熵解码由于串行依赖，在 ViT-Base 负载上耗时高达 150.11 ms。QSGD 与 FetchSGD 同样存在不同程度的耗时瓶颈。
+相比之下，本文提出的位级打包方法将稀疏结构投影为固定维度的布尔掩码，使得编解码可通过固定形状的张量算子并行完成，高度契合 PyTorch 的在线调度机制。在 ViT-Base 上，其端到端耗时仅为 5.498 ms，显著优于 FedBiF (7.165 ms)、FedPAQ (9.161 ms) 与 QSGD (11.197 ms)。
+
+\subsubsection{Efficiency in Static Graph (TensorFlow/XLA)}
+在静态图编译环境中，执行效率高度依赖于计算图的静态化程度。在所有模型负载上，FedBiF 与 FedPAQ 均展现出极低的延迟。而本方法在编码端（Enc）极快，但解码端（Dec）出现耗时增加，导致 E/D (Encode-to-Decode) 耗时比率发生反转。
+造成该差异的根源在于：FedBiF 等算子的输入输出形状固定，XLA 编译器能够执行深度算子融合（Operator Fusion），大幅减少显存访问与 kernel 调度。而本方法在解码阶段依赖 \texttt{tf.where} 算子从位图中恢复非零索引，该操作的输出形状依赖于运行期数据，打破了计算图的静态结构。这迫使 XLA 编译器回退至 Eager/Graph 混合执行模式，引入了额外的动态内存分配与频繁的 kernel 启动开销。
+
+\subsubsection{Coupling Analysis of Operator Structure and Execution Engine}
+综合上述跨架构实证，不同压缩算法的性能差异可从底层算子层面统一归因为以下三类核心计算模式：
+\begin{enumerate}
+    \item \textbf{静态稠密算子 (Static Dense Operators):} 以逐元素运算为主且形状固定（如 FedBiF、FedPAQ）。此类算子高度契合静态图范式，能通过编译器融合逼近硬件显存带宽上限。
+    \item \textbf{动态形状算子 (Dynamic Shape Operators):} 输出规模具有数据依赖性（如本方法与 QSGD 依赖的动态索引提取）。这种结构在动态图中表现优异，但在静态图中会阻碍全局融合优化。
+    \item \textbf{不规则访存与串行控制流 (Irregular Memory & Serial Flow):} FetchSGD 的 \texttt{gather}/\texttt{scatter} 缺乏空间局部性，使得执行受限于显存带宽；而 STC 的逐比特解析存在数据依赖，不仅无法向量化，更无法被编译为静态图。
+\end{enumerate}
+
+\textbf{系统落地启示：} 上述分析揭示，通信压缩算法的端到端加速比不仅取决于数学压缩率，更取决于算法结构与底层执行引擎的耦合度。尽管位级打包在 PyTorch 中展现出卓越的综合性能，但在面向 TensorFlow Lite 等依赖静态推理的终端设备时，通用框架的动态算子会成为制约。这指明了未来边缘落地的关键路径：开发专用于位图解析的定制 C++/CUDA Kernel，以突破通用张量框架的编译限制，将理论带宽优势无损转化为物理设备的执行加速。
+
+% ========================================================
+% 编解码开销基准测试综合数据表
+% ========================================================
+\begin{table}[htbp]
+\centering
+\small 
+\caption{End-to-End Codec Latency Breakdown (ms). Evaluated on RTX 3090 with 10\% compression rate. \textbf{E/D Ratio} denotes the Encode-to-Decode time ratio. STC is omitted in TensorFlow/XLA due to its dynamic serial control flow being incompatible with static graph compilation.}
+\label{tab:codec_latency}
+\setlength{\tabcolsep}{4.5pt} 
+\resizebox{\textwidth}{!}{\begin{tabular}{ll rrrr rrrr}
+\toprule
+\multirow{2}{*}{\textbf{Model Config}} & \multirow{2}{*}{\textbf{Algorithm}} & \multicolumn{4}{c}{\textbf{PyTorch (Dynamic Graph)}} & \multicolumn{4}{c}{\textbf{TensorFlow/XLA (Static Graph)}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-10}
+& & \textbf{Enc} & \textbf{Dec} & \textbf{Total} & \textbf{E/D} & \textbf{Enc} & \textbf{Dec} & \textbf{Total} & \textbf{E/D} \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{LLaMA-7B \\ (LoRA $r=8$)}}
+& Std Top-K (No Comp)        & 0.000 & 0.045 & 0.046 & 0.00 & 0.229 & 0.245 & 0.473 & 0.93 \\
+& FedBiF (1-bit)             & 0.184 & 0.206 & 0.390 & 0.89 & 0.223 & 0.231 & 0.454 & 0.97 \\
+& FedPAQ (8-bit)             & 0.390 & 0.118 & 0.507 & 3.31 & 0.267 & 0.258 & 0.524 & 1.03 \\
+& FetchSGD (CountSketch)     & 1.689 & 11.402& 13.090& 0.15 & 1.077 & 2.036 & 3.113 & 0.53 \\
+& QSGD (4-bit)               & 0.587 & 0.058 & 0.645 & 10.12& 1.105 & 0.264 & 1.369 & 4.19 \\
+& STC (Golomb)               & 2.312 & 1.948 & 4.260 & 1.19 & -- & -- & -- & -- \\
+& \textbf{Ours (GPU Bitmap)} & \textbf{0.190} & \textbf{0.139} & \textbf{0.329} & \textbf{1.37} & \textbf{0.294} & \textbf{1.267} & \textbf{1.561} & \textbf{0.23} \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{ResNet-18 \\ (Full)}}
+& Std Top-K (No Comp)        & 0.000 & 0.116 & 0.117 & 0.00 & 0.257 & 0.266 & 0.522 & 0.97 \\
+& FedBiF (1-bit)             & 0.437 & 0.514 & 0.951 & 0.85 & 0.235 & 0.314 & 0.549 & 0.75 \\
+& FedPAQ (8-bit)             & 0.943 & 0.290 & 1.234 & 3.25 & 0.292 & 0.271 & 0.563 & 1.08 \\
+& FetchSGD (CountSketch)     & 4.311 & 30.606& 34.917& 0.14 & 2.931 & 5.249 & 8.180 & 0.56 \\
+& QSGD (4-bit)               & 1.437 & 0.121 & 1.558 & 11.88& 2.675 & 0.481 & 3.155 & 5.56 \\
+& STC (Golomb)               & 18.030& 4.574 & 22.604& 3.94 & -- & -- & -- & -- \\
+& \textbf{Ours (GPU Bitmap)} & \textbf{0.449} & \textbf{0.321} & \textbf{0.770} & \textbf{1.40} & \textbf{0.265} & \textbf{0.610} & \textbf{0.875} & \textbf{0.43} \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{ResNet-50 \\ (Full)}}
+& Std Top-K (No Comp)        & 0.000 & 0.261 & 0.261 & 0.00 & 0.295 & 0.281 & 0.577 & 1.05 \\
+& FedBiF (1-bit)             & 0.988 & 1.158 & 2.146 & 0.85 & 0.249 & 0.239 & 0.487 & 1.04 \\
+& FedPAQ (8-bit)             & 2.108 & 0.653 & 2.761 & 3.23 & 0.379 & 0.264 & 0.643 & 1.44 \\
+& FetchSGD (CountSketch)     & 9.297 & 70.687& 79.983& 0.13 & 9.370 & 14.092& 23.462& 0.67 \\
+& QSGD (4-bit)               & 3.184 & 0.248 & 3.432 & 12.84& 4.447 & 0.665 & 5.112 & 6.69 \\
+& STC (Golomb)               & 19.695& 10.845& 30.540& 1.82 & -- & -- & -- & -- \\
+& \textbf{Ours (GPU Bitmap)} & \textbf{1.012} & \textbf{0.733} & \textbf{1.745} & \textbf{1.38} & \textbf{0.277} & \textbf{1.118} & \textbf{1.396} & \textbf{0.25} \\
+\midrule
+\multirow{7}{*}{\shortstack[l]{ViT-Base \\ (Full)}}
+& Std Top-K (No Comp)        & 0.000 & 0.865 & 0.865 & 0.00 & 0.312 & 0.319 & 0.632 & 0.98 \\
+& FedBiF (1-bit)             & 3.320 & 3.844 & 7.165 & 0.86 & 0.243 & 0.250 & 0.493 & 0.97 \\
+& FedPAQ (8-bit)             & 6.996 & 2.165 & 9.161 & 3.23 & 0.268 & 0.241 & 0.509 & 1.11 \\
+& FetchSGD (CountSketch)     & 27.294& 239.355& 266.648& 0.11 & 20.012& 38.963& 58.975& 0.51 \\
+& QSGD (4-bit)               & 10.503& 0.693 & 11.197& 15.16& 13.394& 0.407 & 13.800& 32.91 \\
+& STC (Golomb)               & 112.042& 38.067& 150.109& 2.94 & -- & -- & -- & -- \\
+& \textbf{Ours (GPU Bitmap)} & \textbf{3.210} & \textbf{2.288} & \textbf{5.498} & \textbf{1.40} & \textbf{0.276} & \textbf{3.786} & \textbf{4.062} & \textbf{0.07} \\
+\bottomrule
+\end{tabular}}
+
+\end{table}
+
+\end{document}
