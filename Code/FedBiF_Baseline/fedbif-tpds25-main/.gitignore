@@ -1,0 +1,12 @@
+dataset
+log
+*.pyc
+*.pt
+*.png
+*.csv
+*.npy
+*.log
+*.out
+*.json
+*.zip
+*.gz
