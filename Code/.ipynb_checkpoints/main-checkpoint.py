@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-MyFederatedFL —— 统一入口
-"""
 
 import os
 import sys
