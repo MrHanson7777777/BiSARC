@@ -88,14 +88,9 @@ class ResidualClient(BaseClient):
         optimizer = self._make_optimizer(model)
         self._adjust_lr(optimizer, global_round)
 
-        mu = getattr(self.args, 'mu', 0.0)
         cr_up = self.args.cr_up  # Use cr_up to control uplink compression
         use_compression = cr_up is not None and 0 < cr_up < 1
         use_ef = getattr(self.args, 'use_ef', 1)  
-
-        synced_on_device = None
-        if mu > 0 and not self.args.iid:
-            synced_on_device = {k: v.to(self.device) for k, v in train_base.items()}
 
         epoch_loss = []
         for _ in range(self.args.local_ep):
@@ -111,13 +106,6 @@ class ResidualClient(BaseClient):
                                           labels.reshape(-1))
                 else:
                     loss = self.criterion(logits, labels)
-
-                if synced_on_device is not None:
-                    prox = 0.0
-                    for name, param in model.named_parameters():
-                        if name in synced_on_device:
-                            prox += torch.sum((param - synced_on_device[name]) ** 2)
-                    loss += (mu / 2) * prox
 
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)

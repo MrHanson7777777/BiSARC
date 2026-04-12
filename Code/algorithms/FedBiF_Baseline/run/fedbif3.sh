@@ -26,19 +26,19 @@ for ((i=0; i<$num_per_round; i++)); do
 done
 
 if [[ $dataset_id == 1 ]]; then
-    dataset="fmnist"; rounds=100; ip_head="0.0.0.0:1";
+    dataset="fmnist"; rounds=400; ip_head="0.0.0.0:1";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 2 ]]; then
-    dataset="svhn"; rounds=100; ip_head="0.0.0.0:2";
+    dataset="svhn"; rounds=400; ip_head="0.0.0.0:2";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 3 ]]; then
     dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3";
-    part_strategy_list=("labeldir0.5")                  
+    part_strategy_list=("labeldir0.5")                 
 elif [[ $dataset_id == 4 ]]; then
     dataset="cifar100"; rounds=400; ip_head="0.0.0.0:4"; 
-    part_strategy_list=("labeldir0.1")                   
+    part_strategy_list=("labeldir0.5")
 elif [[ $dataset_id == 5 ]]; then
-    dataset="tinyimagenet"; rounds=200; ip_head="0.0.0.0:5";
+    dataset="tinyimagenet"; rounds=400; ip_head="0.0.0.0:5";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 else
     echo "wrong dataset."
@@ -48,7 +48,6 @@ fi
 
 com_type="fedbif"; ip_mid=7; 
 ip="${ip_head}${ip_mid}${ip_end}"
-
 
 for b in 0; do  
     part_strategy=${part_strategy_list[${b}]}
@@ -63,7 +62,7 @@ for b in 0; do
         --num_per_round ${num_per_round} --num_client ${num_client} \
         --gpu ${gpu} --ip ${ip} --log_dir ${dir} &
 
-    for a in $(seq 0 $(($num_per_round-1))); do 
+    for a in $(seq 0 $(($num_per_round-1))); do
     python ../train/client.py \
         --com_type ${com_type} \
         --model ${model} --dataset ${dataset} --part_strategy ${part_strategy} --num_client ${num_client} --id ${a} --val_ratio ${val_ratio} \

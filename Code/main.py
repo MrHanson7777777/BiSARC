@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-MyFederatedFL —— 统一入口
+MyFederatedFL -- Unified Entry
 """
 
 import os
@@ -25,7 +25,7 @@ from models.resnet import ResNet18Fed
 from core.server import FedAvgServer, ResidualServer
 from algorithms.fedavg import FedAvgClient
 from algorithms.residual_fl import ResidualClient
-from algorithms.qsgd import QSGDClient
+from algorithms.qsgd import QSGDClient, QSGDServer
 
 
 # Model construction
@@ -134,6 +134,8 @@ def main():
 
     if is_residual:
         server = ResidualServer(global_model, args)
+    elif is_qsgd:
+        server = QSGDServer(global_model, args)
     else:
         server = FedAvgServer(global_model, args)
 
@@ -275,9 +277,12 @@ def main():
                     downlink_bytes_this_round = 0
                 else:
                     if is_qsgd:
-                        model_weights = server.get_global_weights()
-                        qsgd_model_size = calc_qsgd_bytes(model_weights, args.qsgd_bits)  # Single quantized model size
-                        downlink_bytes_this_round = qsgd_model_size * args.num_users
+                        # Fix: Calculate the volume of the quantized increment returned by the server via aggregate in the previous round
+                        if downlink_broadcast is not None:
+                            qsgd_delta_size = calc_qsgd_bytes(downlink_broadcast, args.qsgd_bits)
+                            downlink_bytes_this_round = qsgd_delta_size * args.num_users
+                        else:
+                            downlink_bytes_this_round = 0
                     else:
                         model_size = get_model_byte_size(server.get_global_weights())
                         downlink_bytes_this_round = model_size * args.num_users
@@ -287,17 +292,16 @@ def main():
             selected = random.sample(range(args.num_users), m)
             global_weights = server.get_global_weights()
 
-            # QSGD Downlink Quantization: Server quantizes the global model before dispatch, simulating real downlink compression noise
+            # QSGD Downlink Quantization: Server quantizes the global model before dispatch, simulating real downlink compression noise                                                                                             
             if is_qsgd:
-                from utils.compression import stochastic_quantize
-                def _quantize_weights(weights, bits):
-                    q = {}
-                    for k, v in weights.items():
-                        if v.dtype.is_floating_point:
-                            q[k], _ = stochastic_quantize(v, num_bits=bits)
-                        else:
-                            q[k] = v.clone()
-                    return q
+                # Due to DoubleSqueeze, QSGDServer maintains the global model explicitly
+                # and already applies error-feedback bidding. We just fetch its model here,
+                # as the compression logic from downlink is handled in QSGDServer's state,
+                # or we just re-quantize the updated global weights if broadcast natively.
+                # Since DoubleSqueeze broadcasts quantized weights (or differences), we can
+                # just use server.get_global_weights() which represents the decompressed current state
+                # simulated on the clients. For simplicity, we pass global weights directly now.
+                pass
 
             local_results = []
             local_losses = []
@@ -326,7 +330,7 @@ def main():
                         del client_base
 
                 result, loss, train_acc = clients[uid].local_train(
-                    _quantize_weights(global_weights, args.qsgd_bits) if is_qsgd else global_weights,
+                    global_weights,       
                     epoch
                 )
                 local_results.append(result)
@@ -368,10 +372,11 @@ def main():
                 # Residual aggregation, return value is the downlink broadcast data for next round
                 downlink_broadcast = server.aggregate(local_results, client_data_sizes)
             elif is_qsgd:
-                # QSGD returns quantized increment delta, needs to be aggregated then added to global
-                _aggregate_qsgd_deltas(server, local_results, client_data_sizes)
+                # Update downlink_broadcast for accurate calculation in the next round
+                downlink_broadcast = server.aggregate(local_results, client_data_sizes)
             else:
                 server.aggregate(local_results, client_data_sizes)
+                downlink_broadcast = None
 
             # Testing and logs
             test_acc, test_loss = server.test(test_dataset)

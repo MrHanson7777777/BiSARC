@@ -2,7 +2,6 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-
 model="resnet18"; dataset_id=3; ip_end=0; gpu_str="0"; lr=0.01; bit=8; 
 momentum=0.9; l2=5e-4; epochs=5; batch_size=32; num_per_round=10; num_client=100; val_ratio=0.0; 
 
@@ -27,21 +26,20 @@ for ((i=0; i<$num_per_round; i++)); do
     gpu_clients+=("${gpu_str:$index:1}")
 done
 
-
 if [[ $dataset_id == 1 ]]; then
-    dataset="fmnist"; rounds=100; ip_head="0.0.0.0:1";
+    dataset="fmnist"; rounds=400; ip_head="0.0.0.0:1";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 2 ]]; then
-    dataset="svhn"; rounds=100; ip_head="0.0.0.0:2";
+    dataset="svhn"; rounds=400; ip_head="0.0.0.0:2";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 3 ]]; then
     dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3"; 
-    part_strategy_list=("labeldir0.1")                  
+    part_strategy_list=("labeldir0.5")                 
 elif [[ $dataset_id == 4 ]]; then
-    dataset="cifar100"; rounds=200; ip_head="0.0.0.0:4";
+    dataset="cifar100"; rounds=400; ip_head="0.0.0.0:4";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 5 ]]; then
-    dataset="tinyimagenet"; rounds=200; ip_head="0.0.0.0:5";
+    dataset="tinyimagenet"; rounds=400; ip_head="0.0.0.0:5";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 else
     echo "wrong dataset."
@@ -65,7 +63,7 @@ for b in 0; do
         --num_per_round ${num_per_round} --num_client ${num_client} \
         --gpu ${gpu} --ip ${ip} --log_dir ${dir} &
 
-    for a in $(seq 0 $(($num_per_round-1))); do
+    for a in $(seq 0 $(($num_per_round-1))); do 
     python ../train/client.py \
         --com_type ${com_type} \
         --model ${model} --dataset ${dataset} --part_strategy ${part_strategy} --num_client ${num_client} --id ${a} --val_ratio ${val_ratio} \

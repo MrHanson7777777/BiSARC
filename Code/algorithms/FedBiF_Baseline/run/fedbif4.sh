@@ -2,9 +2,8 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-model="resnet18"; dataset_id=3; ip_end=0; gpu_str="0"; lr=0.01; bit=8; 
+model="resnet18"; dataset_id=4; ip_end=0; gpu_str="0"; lr=0.01; bit=8; 
 momentum=0.9; l2=5e-4; epochs=5; batch_size=32; num_per_round=10; num_client=100; val_ratio=0.0; 
-
 
 if [ -n "$1" ]; then
     dataset_id=$1
@@ -27,19 +26,19 @@ for ((i=0; i<$num_per_round; i++)); do
 done
 
 if [[ $dataset_id == 1 ]]; then
-    dataset="fmnist"; rounds=100; ip_head="0.0.0.0:1";
+    dataset="fmnist"; rounds=400; ip_head="0.0.0.0:1";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 2 ]]; then
-    dataset="svhn"; rounds=100; ip_head="0.0.0.0:2";
+    dataset="svhn"; rounds=400; ip_head="0.0.0.0:2";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 3 ]]; then
-    dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3"; 
-    part_strategy_list=("labeldir0.5")                 
+    dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3";
+    part_strategy_list=("labeldir0.5")                  
 elif [[ $dataset_id == 4 ]]; then
-    dataset="cifar100"; rounds=200; ip_head="0.0.0.0:4";
-    part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
+    dataset="cifar100"; rounds=400; ip_head="0.0.0.0:4"; 
+    part_strategy_list=("labeldir0.1")                   
 elif [[ $dataset_id == 5 ]]; then
-    dataset="tinyimagenet"; rounds=200; ip_head="0.0.0.0:5";
+    dataset="tinyimagenet"; rounds=400; ip_head="0.0.0.0:5";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 else
     echo "wrong dataset."
@@ -49,6 +48,7 @@ fi
 
 com_type="fedbif"; ip_mid=7; 
 ip="${ip_head}${ip_mid}${ip_end}"
+
 
 for b in 0; do  
     part_strategy=${part_strategy_list[${b}]}
