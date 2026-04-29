@@ -1,3 +1,3 @@
-from .fedavg import FedAvgClient
+﻿from .fedavg import FedAvgClient
 from .residual_fl import ResidualClient
-from .qsgd import QSGDClient
+from .doublesqueeze import DoubleSqueezeClient

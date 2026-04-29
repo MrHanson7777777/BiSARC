@@ -68,6 +68,25 @@ class FedAvgClient(BaseClient):
 
         return model.state_dict(), sum(epoch_loss) / len(epoch_loss), train_acc
 
+    # Compatibility fallback: some environments may run with an older BaseClient.
+    def evaluate_on_training_data(self, model):
+        model.to(self.device).eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for images, labels in self.trainloader:
+                images, labels = images.to(self.device), labels.to(self.device)
+                outputs = model(images)
+
+                # NLP sequence tasks: flatten tensors
+                if outputs.dim() == 3:
+                    outputs = outputs.reshape(-1, outputs.size(-1))
+                    labels = labels.reshape(-1)
+
+                _, preds = torch.max(outputs, 1)
+                correct += (preds == labels).sum().item()
+                total += labels.size(0)
+        return correct / total if total > 0 else 0.0
+
     def _build_local_model(self, global_weights):
         from models.cnn import CNNMnist, CNNCifar, CNNFemnist
         from models.resnet import ResNet18Fed

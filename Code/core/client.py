@@ -121,6 +121,11 @@ class BaseClient:
         
         return correct / total if total > 0 else 0.0
 
+    # Backward/compat alias.
+    # Some checkpoints / environments may reference an older method name.
+    def evaluate_train_accuracy(self, model):
+        return self.evaluate_on_training_data(model)
+
     def local_train(self, global_weights, global_round):
         """
         Execute local training and return update results.

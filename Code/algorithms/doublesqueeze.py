@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-QSGD Client —— Stochastic quantization compression baseline
+DoubleSqueeze Client —— Stochastic quantization compression baseline
 """
 
 import copy
@@ -14,11 +14,11 @@ from core.server import FedAvgServer
 from utils.compression import stochastic_quantize
 
 
-class QSGDClient(FedAvgClient):
+class DoubleSqueezeClient(FedAvgClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.error_feedback = None
-        # Control whether to turn on error feedback (1 means on, which equals to DoubleSqueeze; 0 means off, which equals to pure QSGD)
+        # Control whether to turn on error feedback (1 means on for standard DoubleSqueeze; 0 means off)
         self.use_ef = getattr(self.args, 'use_ef', 1)
 
     def local_train(self, global_weights, global_round):
@@ -37,33 +37,33 @@ class QSGDClient(FedAvgClient):
         optimizer = self._make_optimizer(model)
         self._adjust_lr(optimizer, global_round)
 
-        epoch_loss = []
-        for _ in range(self.args.local_ep):
-            batch_loss = []
-            for inputs, labels in self.trainloader:
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
-                optimizer.zero_grad()
-                outputs = model(inputs)
+        try:
+            inputs, labels = next(iter(self.trainloader))
+        except StopIteration:
+            iterator = iter(self.trainloader)
+            inputs, labels = next(iterator)
 
-                if outputs.dim() == 3:
-                    loss = self.criterion(outputs.reshape(-1, outputs.size(-1)),
-                                          labels.reshape(-1))
-                else:
-                    loss = self.criterion(outputs, labels)
+        inputs, labels = inputs.to(self.device), labels.to(self.device)
+        optimizer.zero_grad()
+        outputs = model(inputs)
 
-                loss.backward()
+        if outputs.dim() == 3:
+            loss = self.criterion(outputs.reshape(-1, outputs.size(-1)), labels.reshape(-1))
+        else:
+            loss = self.criterion(outputs, labels)
 
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                optimizer.step()
-                batch_loss.append(loss.item())
-            epoch_loss.append(sum(batch_loss) / len(batch_loss))
+        loss.backward()
 
-        train_acc = self.evaluate_on_training_data(model)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
+        
+        loss_val = loss.item()
+        train_acc = 0.0 # Skipping full train_acc calculation to strictly align with Single-step SGD
 
         new_weights = model.state_dict()
         quantized_delta = {}
 
-        num_bits = getattr(self.args, 'qsgd_bits', 8)
+        num_bits = getattr(self.args, 'doublesqueeze_bits', 8)
 
         if self.error_feedback is None:
             self.error_feedback = {k: torch.zeros_like(v).cpu() for k, v in global_weights.items()}
@@ -85,9 +85,9 @@ class QSGDClient(FedAvgClient):
             else:
                 quantized_delta[k] = diff
 
-        return quantized_delta, sum(epoch_loss) / len(epoch_loss), train_acc
+        return quantized_delta, loss_val, train_acc
 
-class QSGDServer(FedAvgServer):
+class DoubleSqueezeServer(FedAvgServer):
     def __init__(self, global_model, args):
         super().__init__(global_model, args)
         weights = self.global_model.state_dict()
@@ -107,7 +107,7 @@ class QSGDServer(FedAvgServer):
             for k in aggregated_delta.keys():
                 aggregated_delta[k] += local_delta[k].cpu() * weight
 
-        num_bits = getattr(self.args, 'qsgd_bits', 8)
+        num_bits = getattr(self.args, 'doublesqueeze_bits', 8)
         
         quantized_global_delta = {}
         global_weights_cpu = {k: v.cpu() for k, v in self.global_model.state_dict().items()}

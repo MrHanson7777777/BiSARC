@@ -1,0 +1,6 @@
+# Minimal runtime deps for BiSARC main entry + comm overhead experiment
+# NOTE: Install PyTorch separately to match your CUDA version.
+
+numpy
+matplotlib>=3.7.0
+tqdm
