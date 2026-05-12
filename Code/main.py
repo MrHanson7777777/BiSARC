@@ -26,6 +26,7 @@ from core.server import FedAvgServer, ResidualServer
 from algorithms.fedavg import FedAvgClient
 from algorithms.residual_fl import ResidualClient
 from algorithms.qsgd import QSGDClient, QSGDServer
+from algorithms.doublesqueeze import DoubleSqueezeClient, DoubleSqueezeServer
 
 
 # Model construction
@@ -40,7 +41,7 @@ def build_model(args):
         else:
             model = CNNCifar(num_classes=args.num_classes)
     elif args.model == 'resnet18':
-        norm_type = 'groupnorm' if not args.iid else 'groupnorm'  # Unified use of GroupNorm
+        norm_type = 'groupnorm'  # GroupNorm is more stable than BatchNorm under partial participation
         model = ResNet18Fed(num_classes=args.num_classes, norm_type=norm_type)
     elif args.model == 'lstm':
         from models.rnn import CharLSTM
@@ -127,6 +128,8 @@ def main():
 
     is_residual = (args.alg == 'ours')
     is_qsgd = (args.alg == 'qsgd')
+    # DoubleSqueeze: bidirectional stochastic-quantization EF baseline restricted to E=1 (single-step)
+    is_doublesqueeze = (args.alg == 'doublesqueeze')
     cr_up = args.cr_up
     cr_down = args.cr_down
     use_compression_up = cr_up is not None and 0 < cr_up < 1
@@ -136,6 +139,8 @@ def main():
         server = ResidualServer(global_model, args)
     elif is_qsgd:
         server = QSGDServer(global_model, args)
+    elif is_doublesqueeze:
+        server = DoubleSqueezeServer(global_model, args)
     else:
         server = FedAvgServer(global_model, args)
 
@@ -149,6 +154,8 @@ def main():
             clients[uid] = ResidualClient(args, train_dataset, user_groups[uid], global_model)
         elif args.alg == 'qsgd':
             clients[uid] = QSGDClient(args, train_dataset, user_groups[uid], global_model)
+        elif args.alg == 'doublesqueeze':
+            clients[uid] = DoubleSqueezeClient(args, train_dataset, user_groups[uid], global_model)
 
     logger = MetricsLogger()
     total_comm_bytes = 0  # Cumulative communication bytes (calculated from cold start)
@@ -168,6 +175,7 @@ def main():
 
     # Record drift for ours / ours+disable_sync
     track_drift = is_residual
+    doublesqueeze_bits = getattr(args, 'doublesqueeze_bits', 8)
 
     # Cold start
     # Convention: Cold start communication cost = cost of initial model distribution from server to clients.
@@ -217,6 +225,8 @@ def main():
         gw = server.get_global_weights()
         if is_qsgd:
             init_down_bytes_per_client = calc_qsgd_bytes(gw, args.qsgd_bits)
+        elif is_doublesqueeze:
+            init_down_bytes_per_client = calc_qsgd_bytes(gw, doublesqueeze_bits)
         else:
             init_down_bytes_per_client = get_model_byte_size(gw)
         coldstart_total_bytes = init_down_bytes_per_client * args.num_users
@@ -277,10 +287,15 @@ def main():
                     downlink_bytes_this_round = 0
                 else:
                     if is_qsgd:
-                        # Fix: Calculate the volume of the quantized increment returned by the server via aggregate in the previous round
                         if downlink_broadcast is not None:
                             qsgd_delta_size = calc_qsgd_bytes(downlink_broadcast, args.qsgd_bits)
                             downlink_bytes_this_round = qsgd_delta_size * args.num_users
+                        else:
+                            downlink_bytes_this_round = 0
+                    elif is_doublesqueeze:
+                        if downlink_broadcast is not None:
+                            ds_delta_size = calc_qsgd_bytes(downlink_broadcast, doublesqueeze_bits)
+                            downlink_bytes_this_round = ds_delta_size * args.num_users
                         else:
                             downlink_bytes_this_round = 0
                     else:
@@ -292,16 +307,9 @@ def main():
             selected = random.sample(range(args.num_users), m)
             global_weights = server.get_global_weights()
 
-            # QSGD Downlink Quantization: Server quantizes the global model before dispatch, simulating real downlink compression noise                                                                                             
-            if is_qsgd:
-                # Due to DoubleSqueeze, QSGDServer maintains the global model explicitly
-                # and already applies error-feedback bidding. We just fetch its model here,
-                # as the compression logic from downlink is handled in QSGDServer's state,
-                # or we just re-quantize the updated global weights if broadcast natively.
-                # Since DoubleSqueeze broadcasts quantized weights (or differences), we can
-                # just use server.get_global_weights() which represents the decompressed current state
-                # simulated on the clients. For simplicity, we pass global weights directly now.
-                pass
+            # QSGD/DoubleSqueeze: downlink compression is handled inside server.aggregate(),
+            # which returns the quantized delta used for byte accounting. No extra action needed here.
+            pass
 
             local_results = []
             local_losses = []
@@ -356,8 +364,9 @@ def main():
                     else:
                         uplink_bytes_this_round += get_model_byte_size(result)
                 elif is_qsgd:
-                    # QSGD: Use quantized theoretical transmission amount
                     uplink_bytes_this_round += calc_qsgd_bytes(result, args.qsgd_bits)
+                elif is_doublesqueeze:
+                    uplink_bytes_this_round += calc_qsgd_bytes(result, doublesqueeze_bits)
                 else:
                     # FedAvg/FedProx: Each client uploads complete state_dict
                     uplink_bytes_this_round += get_model_byte_size(result)
@@ -372,7 +381,8 @@ def main():
                 # Residual aggregation, return value is the downlink broadcast data for next round
                 downlink_broadcast = server.aggregate(local_results, client_data_sizes)
             elif is_qsgd:
-                # Update downlink_broadcast for accurate calculation in the next round
+                downlink_broadcast = server.aggregate(local_results, client_data_sizes)
+            elif is_doublesqueeze:
                 downlink_broadcast = server.aggregate(local_results, client_data_sizes)
             else:
                 server.aggregate(local_results, client_data_sizes)
@@ -492,6 +502,8 @@ def _print_experiment_info(args, use_compression, is_residual):
         print(f"FedProx Config: mu={args.mu}")
     if args.alg == 'qsgd':
         print(f"QSGD Config: Quantization Bits={args.qsgd_bits}")
+    if args.alg == 'doublesqueeze':
+        print(f"DoubleSqueeze Config: Quantization Bits={args.doublesqueeze_bits} (E=1, bidirectional EF baseline)")
     use_ema_str = f"EMA={'On' if args.use_ema else 'Off'}"
     device_str = f"cuda:{args.gpu}" if args.gpu is not None else "cpu"
     print(f"Other Configs: {use_ema_str}, Device={device_str}, Optimizer={args.optimizer}, LR={args.lr}, Seed={args.seed}")

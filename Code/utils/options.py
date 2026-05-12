@@ -9,8 +9,8 @@ def args_parser():
 
     # Algorithm selection
     p.add_argument('--alg', type=str, default='fedavg',
-                   choices=['fedavg', 'fedprox', 'ours', 'qsgd'],
-                   help='Algorithm: fedavg | fedprox | ours (Bidirectional residual compression+Sync) | qsgd')
+                   choices=['fedavg', 'fedprox', 'ours', 'qsgd', 'doublesqueeze'],
+                   help='Algorithm: fedavg | fedprox | ours (BiSARC) | qsgd | doublesqueeze (E=1 bidirectional quantized EF baseline)')
 
     # Federated learning parameters
     p.add_argument('--epochs', type=int, default=50, help='Global training epochs')
@@ -57,6 +57,10 @@ def args_parser():
 
     # QSGD parameters
     p.add_argument('--qsgd_bits', type=int, default=8, help='QSGD quantization bits')
+
+    # DoubleSqueeze parameters (bidirectional quantized EF, E=1 single-step baseline)
+    p.add_argument('--doublesqueeze_bits', type=int, default=8,
+                   help='DoubleSqueeze quantization bits for both uplink and downlink')
 
     # Others
     p.add_argument('--gpu', type=int, default=None, help='GPU ID')

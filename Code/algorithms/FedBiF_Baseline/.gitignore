@@ -1,5 +1,7 @@
-dataset
-log
+dataset/
+log/
+.ipynb_checkpoints/
+__pycache__/
 *.pyc
 *.pt
 *.png

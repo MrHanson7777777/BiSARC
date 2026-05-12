@@ -34,14 +34,17 @@ class FedAvgServer:
         return copy.deepcopy(self.global_model.state_dict())
 
     def aggregate(self, local_weights_list, client_data_sizes):
-        num_clients = len(local_weights_list)
-        avg = copy.deepcopy(local_weights_list[0])
-        
-        for key in avg:
-            avg[key] = local_weights_list[0][key] / num_clients
-            for i in range(1, num_clients):
-                avg[key] += local_weights_list[i][key] / num_clients
-        
+        total_samples = sum(client_data_sizes)
+        weights = [s / total_samples for s in client_data_sizes]
+
+        avg = {}
+        for key in local_weights_list[0]:
+            avg[key] = torch.zeros_like(local_weights_list[0][key], dtype=torch.float32)
+            for i, local_w in enumerate(local_weights_list):
+                avg[key] += weights[i] * local_w[key].float()
+            # Cast back to original dtype (e.g. int64 for buffers like num_batches_tracked)
+            avg[key] = avg[key].to(local_weights_list[0][key].dtype)
+
         self.global_model.load_state_dict(avg)
 
     def test(self, test_dataset):

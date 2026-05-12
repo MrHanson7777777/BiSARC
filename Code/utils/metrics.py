@@ -239,3 +239,9 @@ class MetricsLogger:
         
         if args.alg == 'fedprox' and hasattr(args, 'mu'):
             method_name += f"_mu{args.mu}"
+        if args.alg == 'qsgd' and hasattr(args, 'qsgd_bits'):
+            method_name += f"_Q{args.qsgd_bits}b"
+        if args.alg == 'doublesqueeze' and hasattr(args, 'doublesqueeze_bits'):
+            method_name += f"_DS{args.doublesqueeze_bits}b"
+
+        return method_name

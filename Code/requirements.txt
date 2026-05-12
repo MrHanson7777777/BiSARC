@@ -1,6 +1,13 @@
-# Minimal runtime deps for BiSARC main entry + comm overhead experiment
-# NOTE: Install PyTorch separately to match your CUDA version.
+# BiSARC runtime dependencies
+# PyTorch: install separately to match your CUDA version.
+# See https://pytorch.org/get-started/locally/ for CUDA-specific wheels.
+# Example (CPU-only): pip install torch torchvision
+# Example (CUDA 11.8): pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
-numpy
+numpy>=1.23.0
 matplotlib>=3.7.0
-tqdm
+tqdm>=4.65.0
+pandas>=1.5.0         # used in comm overhead experiment CSV export
+
+# Optional: framework consistency test
+# tensorflow>=2.12.0  # uncomment to run tests/Framework Consistency Test/TensorFlow.py
