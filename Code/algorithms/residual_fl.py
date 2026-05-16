@@ -206,7 +206,8 @@ class ResidualClient(BaseClient):
         return m
 
     def get_train_base_weights(self):
-        # Return current training base weights
+        # Return the weights that the next local training step will start from.
+        # +Sync uses the synchronized replica; -Sync ablation uses the drifting local replica.
         if self.disable_sync and hasattr(self, 'local_model'):
             return {k: v.clone() for k, v in self.local_model.items()}
         return {k: v.clone() for k, v in self.synced_model.items()}

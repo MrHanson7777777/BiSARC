@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 MyFederatedFL -- Unified Entry
@@ -18,7 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from utils.options import args_parser
 from utils.metrics import MetricsLogger
-from utils.compression import unpack_sparse, calc_comm_bytes, calc_qsgd_bytes
+from utils.compression import (
+    unpack_sparse,
+    calc_comm_bytes,
+    calc_qsgd_bytes,
+    calc_stochastic_quantization_bytes,
+)
 from data.dataset import get_dataset
 from models.cnn import CNNMnist, CNNCifar, CNNFemnist
 from models.resnet import ResNet18Fed
@@ -62,40 +67,6 @@ def get_model_byte_size(state_dict):
     return total_bytes
 
 
-def _aggregate_qsgd_deltas(server, delta_list, client_data_sizes):
-    """
-    Aggregate the quantized intermediate delta returned by QSGD clients.
-
-    QSGD client returns quantized delta = W_new - W_old (not full weights),
-    so we need to perform weighted average on delta first, and then apply it to the global model.
-
-    Args:
-        server: FedAvgServer instance
-        delta_list: List of quantized deltas from clients [{key: Tensor}, ...]
-        client_data_sizes: List of data sizes from all clients
-    """
-    total_samples = sum(client_data_sizes)
-    weights = [s / total_samples for s in client_data_sizes]
-
-    avg_delta = {}
-    for key in delta_list[0]:
-        avg_delta[key] = torch.zeros_like(delta_list[0][key])
-        for i, delta in enumerate(delta_list):
-            avg_delta[key] += weights[i] * delta[key].to(avg_delta[key].device)
-
-    cur = server.global_model.state_dict()
-    updated = {}
-    for key in cur:
-        if key in avg_delta:
-            d = avg_delta[key]
-            if d.device != cur[key].device:
-                d = d.to(cur[key].device)
-            updated[key] = cur[key] + d
-        else:
-            updated[key] = cur[key]
-    server.global_model.load_state_dict(updated)
-
-
 # Main training process
 
 def main():
@@ -126,7 +97,7 @@ def main():
     global_model = build_model(args)
     print(f"Model: {args.model}, Params: {sum(p.numel() for p in global_model.parameters()):,}")
 
-    is_residual = (args.alg == 'ours')
+    is_residual = (args.alg == 'bisarc')
     is_qsgd = (args.alg == 'qsgd')
     # DoubleSqueeze: bidirectional stochastic-quantization EF baseline restricted to E=1 (single-step)
     is_doublesqueeze = (args.alg == 'doublesqueeze')
@@ -150,7 +121,7 @@ def main():
             clients[uid] = FedAvgClient(args, train_dataset, user_groups[uid], global_model)
         elif args.alg == 'fedprox':
             clients[uid] = FedAvgClient(args, train_dataset, user_groups[uid], global_model)
-        elif args.alg == 'ours':
+        elif args.alg == 'bisarc':
             clients[uid] = ResidualClient(args, train_dataset, user_groups[uid], global_model)
         elif args.alg == 'qsgd':
             clients[uid] = QSGDClient(args, train_dataset, user_groups[uid], global_model)
@@ -173,13 +144,13 @@ def main():
 
     _print_experiment_info(args, use_compression_up or use_compression_down, is_residual)
 
-    # Record drift for ours / ours+disable_sync
+    # Record drift for BiSARC / BiSARC+disable_sync
     track_drift = is_residual
     doublesqueeze_bits = getattr(args, 'doublesqueeze_bits', 8)
 
     # Cold start
     # Convention: Cold start communication cost = cost of initial model distribution from server to clients.
-    # - ours: If downlink compression is enabled and streaming is needed, calculate real packet size per step, broadcast to all clients.
+    # - BiSARC: If downlink compression is enabled and streaming is needed, calculate real packet size per step, broadcast to all clients.
     # - fedavg/fedprox/qsgd: Distribute "full model/quantized model" to all clients once before training starts.
     coldstart_total_bytes = 0
     coldstart_peak_bytes = 0
@@ -201,6 +172,7 @@ def main():
 
                     template = {k: torch.zeros_like(v, device='cpu')
                                 for k, v in global_model.state_dict().items()}
+                    # Each client can unpack the same sparse packet independently, so we unpack once outside the client loop.
                     dense_delta = unpack_sparse(packed_delta, template)
                     for uid in range(args.num_users):
                         clients[uid].apply_downlink(dense_delta)
@@ -223,12 +195,8 @@ def main():
         # Non-residual algorithms also require this "initial model distribution" step, otherwise cumulative counts omit cold start.
         # Here according to real downlink perspective: each client receives a copy of the initial model.
         gw = server.get_global_weights()
-        if is_qsgd:
-            init_down_bytes_per_client = calc_qsgd_bytes(gw, args.qsgd_bits)
-        elif is_doublesqueeze:
-            init_down_bytes_per_client = calc_qsgd_bytes(gw, doublesqueeze_bits)
-        else:
-            init_down_bytes_per_client = get_model_byte_size(gw)
+        # Cold start distributes the initial full model; compression/quantization applies to training-phase updates.
+        init_down_bytes_per_client = get_model_byte_size(gw)
         coldstart_total_bytes = init_down_bytes_per_client * args.num_users
         coldstart_peak_bytes = coldstart_total_bytes
         total_comm_bytes += coldstart_total_bytes
@@ -274,6 +242,7 @@ def main():
                     # Apply downlink update to all clients
                     template = {k: v.cpu() for k, v in server.global_model.state_dict().items()}
                     if use_compression_down:
+                        # Each client can unpack the same sparse packet independently, so we unpack once outside the client loop.
                         dense_down = unpack_sparse(downlink_broadcast, template)
                     else:
                         dense_down = downlink_broadcast
@@ -288,13 +257,12 @@ def main():
                 else:
                     if is_qsgd:
                         if downlink_broadcast is not None:
-                            qsgd_delta_size = calc_qsgd_bytes(downlink_broadcast, args.qsgd_bits)
-                            downlink_bytes_this_round = qsgd_delta_size * args.num_users
+                            downlink_bytes_this_round = get_model_byte_size(downlink_broadcast) * args.num_users
                         else:
                             downlink_bytes_this_round = 0
                     elif is_doublesqueeze:
                         if downlink_broadcast is not None:
-                            ds_delta_size = calc_qsgd_bytes(downlink_broadcast, doublesqueeze_bits)
+                            ds_delta_size = calc_stochastic_quantization_bytes(downlink_broadcast, doublesqueeze_bits)
                             downlink_bytes_this_round = ds_delta_size * args.num_users
                         else:
                             downlink_bytes_this_round = 0
@@ -321,7 +289,7 @@ def main():
 
             for uid in selected:
                 # Init Drift calculation
-                # ours(+Sync): synced_model locked → Init Drift ≈ 0 (horizontal line)
+                # BiSARC(+Sync): synced_model locked -> Init Drift ~= 0 (horizontal line)
                 # (-Sync) ablation: local_model accumulates error continuously → Init Drift rises continuously (explodes)
                 if track_drift:
                     if is_residual:
@@ -347,7 +315,7 @@ def main():
                 client_data_sizes.append(len(user_groups[uid]))
 
                 # Post Drift calculation
-                # ours may also face post-training deviation under Non-IID data
+                # BiSARC may also face post-training deviation under Non-IID data
                 if track_drift:
                     post_weights = clients[uid].get_local_weights_after_train()
                     if post_weights is not None:
@@ -477,6 +445,7 @@ def main():
     # Final testing
     test_acc, test_loss = server.test(test_dataset)
 
+    logger.save(args)
     logger.close()
 
     print("Training completed")

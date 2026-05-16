@@ -32,7 +32,7 @@ class FLTimer:
     def __init__(self):
         self.pack_time = 0.0
         self.unpack_time = 0.0
-        self.total_fit_time = 0.0  # 新增：记录一整轮的总时间
+        self.total_fit_time = 0.0  # Record the total time of a full fit round.
         self.pack_calls = 0
         self.unpack_calls = 0
         self.fit_calls = 0
@@ -61,29 +61,29 @@ class FLTimer:
         self.fit_calls += 1
 
     def save_final_stats(self, log_dir, client_id):
-        """实验结束时，计算时间占比并写入文件"""
+        """Compute time ratios at the end of the experiment and write them to disk."""
         if self.fit_calls == 0:
             return
 
-        # 计算总耗时、打包耗时、解包耗时
+        # Compute total, packing, and unpacking time.
         total_time_ms = (self.total_fit_time / self.fit_calls) * 1000
         avg_pack = (self.pack_time / self.pack_calls) * 1000 if self.pack_calls > 0 else 0
         avg_unpack = (self.unpack_time / self.unpack_calls) * 1000 if self.unpack_calls > 0 else 0
         
-        # 剩下的时间自然就是真正的本地模型训练(前向+反向传播)时间
+        # The remaining time is local model training time.
         avg_train = total_time_ms - avg_pack - avg_unpack
 
-        # 计算百分比
+        # Compute percentages.
         pack_ratio = (avg_pack / total_time_ms) * 100
         unpack_ratio = (avg_unpack / total_time_ms) * 100
         train_ratio = (avg_train / total_time_ms) * 100
         
         stats_file = os.path.join(log_dir, "packing_ratio_stats.txt")
         with open(stats_file, "a", encoding="utf-8") as f:
-            f.write(f"Client {client_id} | 总耗时: {total_time_ms:.2f}ms\n")
-            f.write(f"  ├─ 打包开销: {avg_pack:.2f}ms ({pack_ratio:.2f}%)\n")
-            f.write(f"  ├─ 解包开销: {avg_unpack:.2f}ms ({unpack_ratio:.2f}%)\n")
-            f.write(f"  └─ 本地训练: {avg_train:.2f}ms ({train_ratio:.2f}%)\n\n")
+            f.write(f"Client {client_id} | Total time: {total_time_ms:.2f}ms\n")
+            f.write(f"  Pack overhead: {avg_pack:.2f}ms ({pack_ratio:.2f}%)\n")
+            f.write(f"  Unpack overhead: {avg_unpack:.2f}ms ({unpack_ratio:.2f}%)\n")
+            f.write(f"  Local train: {avg_train:.2f}ms ({train_ratio:.2f}%)\n\n")
 
 global_fl_timer = FLTimer()
 
@@ -128,30 +128,27 @@ class Client(fl.client.NumPyClient):
             return [val.cpu().numpy() for _, val in state_dict.items()]
 
     def fit(self, parameters, config):
-        # === 1. 新增：记录整个 fit 流程的总时间起点 ===
         fit_start_t = global_fl_timer.start()
 
-        # 记录解包时间
+        # Unpack: apply server parameters to local model
+        config["ids"] = [int(num) for num in config["ids"].split('.')]
         start_t = global_fl_timer.start()
         self.set_parameters(parameters, config)
         global_fl_timer.record_unpack(start_t)
-        
-        config["ids"] = [int(num) for num in config["ids"].split('.')]
-        self.set_parameters(parameters, config)
+
         trainloader, valloader = get_client_train_dataloader(
             self.train_data, self.dataset_name, self.part_strategy,
             self.num_client, config["ids"][self.id], config["batch_size"], self.val_ratio)
         results = train(self.model, trainloader, valloader, config, self.device)
         self.logger.info("round %d client #%d, val loss: %.4f, val acc: %.4f" % (
             config["round"], config["ids"][self.id], results["val_loss"], results["val_accuracy"]))
-        parameters_prime = self.get_parameters(config)
-        
+
+        # Pack: serialize updated model for uplink transmission
         start_t = global_fl_timer.start()
-        res_parameters = self.get_parameters(config)
+        parameters_prime = self.get_parameters(config)
         global_fl_timer.record_pack(start_t)
 
-        # === 2. 新增：记录整个 fit 流程的总时间终点 ===
-        global_fl_timer.record_fit_total(fit_start_t)    
+        global_fl_timer.record_fit_total(fit_start_t)
         return parameters_prime, len(trainloader), results
 
 
@@ -178,14 +175,9 @@ if __name__ == "__main__":
         else:
             time.sleep(1)
     print("start client {}".format(args.id))
-    fl.client.start_numpy_client(server_address=args.ip, client=client)
-    
-    # === 带有安全保护的启动与保存代码 ===
     try:
         fl.client.start_numpy_client(server_address=args.ip, client=client)
-    except Exception as e:
-        # 忽略所有断开连接的报错，让程序继续往下走
+    except Exception:
         pass
     finally:
-        # finally 块中的代码，无论上面是否报错、怎么报错，都绝对会执行！
         global_fl_timer.save_final_stats(args.log_dir, args.id)

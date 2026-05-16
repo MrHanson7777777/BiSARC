@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import argparse
@@ -9,8 +9,8 @@ def args_parser():
 
     # Algorithm selection
     p.add_argument('--alg', type=str, default='fedavg',
-                   choices=['fedavg', 'fedprox', 'ours', 'qsgd', 'doublesqueeze'],
-                   help='Algorithm: fedavg | fedprox | ours (BiSARC) | qsgd | doublesqueeze (E=1 bidirectional quantized EF baseline)')
+                   choices=['fedavg', 'fedprox', 'bisarc', 'qsgd', 'doublesqueeze'],
+                   help='Algorithm: fedavg | fedprox | bisarc (BiSARC) | qsgd | doublesqueeze (E=1 bidirectional quantized EF baseline)')
 
     # Federated learning parameters
     p.add_argument('--epochs', type=int, default=50, help='Global training epochs')

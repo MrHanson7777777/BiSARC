@@ -5,7 +5,7 @@
 This script is a *standalone* entry to reproduce the communication overhead
 comparison across three algorithms:
 
-- ours: bidirectional Top-K residual compression, uplink/downlink CR = 0.1
+- bisarc: bidirectional Top-K residual compression, uplink/downlink CR = 0.1
 - fedavg: 32-bit dense uplink + downlink broadcast to all clients
 - doublesqueeze: 4-bit stochastic quantization (with error feedback)
 
@@ -38,8 +38,9 @@ import numpy as np
 import torch
 
 
-# Ensure `Code/` is on PYTHONPATH when run from repo root.
-_CODE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Ensure `Code/` is on PYTHONPATH when run from the repository root or `Code/`.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CODE_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..'))
 if _CODE_DIR not in sys.path:
     sys.path.insert(0, _CODE_DIR)
 
@@ -130,7 +131,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
     a.alg = alg
 
     # Hard constraints from the request.
-    if alg == 'ours':
+    if alg == 'bisarc':
         a.cr_up = 0.1
         a.cr_down = 0.1
         # `ResidualServer` uses `tx_bits` for values precision when packing.
@@ -160,7 +161,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
     global_model = build_model(a)
 
     # Server + clients
-    if alg == 'ours':
+    if alg == 'bisarc':
         server = ResidualServer(global_model, a)
         clients = {
             uid: ResidualClient(a, train_dataset, user_groups[uid], global_model)
@@ -183,7 +184,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
     # Figure 1 is about **single-round peak bandwidth requirement**.
     # Here we treat "peak" as the *largest one-shot message size* that must be
     # delivered in that round.
-    # - For ours (streaming init): peak = max(streaming-step message)
+    # - For BiSARC (streaming init): peak = max(streaming-step message)
     # - For fedavg/doublesqueeze: peak = full initialization broadcast size
     total_comm_bytes = 0.0
     main_cum_comm_bytes = 0.0
@@ -192,7 +193,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
 
     gw = server.get_global_weights()
 
-    if alg == 'ours':
+    if alg == 'bisarc':
         # We follow the same convention as `main.py`:
         # residual may have streaming init when downlink compression is enabled.
         use_compression_down = a.cr_down is not None and 0 < a.cr_down < 1
@@ -248,11 +249,11 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
     #   (1) clients train + upload (uplink)
     #   (2) server aggregates
     #   (3) server broadcasts the *current round's* aggregated payload (downlink)
-    # Therefore, for `ours` and `doublesqueeze`, the downlink payload is produced
+    # Therefore, for `bisarc` and `doublesqueeze`, the downlink payload is produced
     # by this round's `server.aggregate(...)`, not a cached payload from the
     # previous round.
-    use_compression_up = (alg == 'ours') and (a.cr_up is not None and 0 < a.cr_up < 1)
-    use_compression_down = (alg == 'ours') and (a.cr_down is not None and 0 < a.cr_down < 1)
+    use_compression_up = (alg == 'bisarc') and (a.cr_up is not None and 0 < a.cr_up < 1)
+    use_compression_down = (alg == 'bisarc') and (a.cr_down is not None and 0 < a.cr_down < 1)
 
     for epoch in range(a.epochs):
         m = max(int(a.frac * a.num_users), 1)
@@ -269,7 +270,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
             local_results.append(result)
             client_data_sizes.append(len(user_groups[uid]))
 
-            if alg == 'ours':
+            if alg == 'bisarc':
                 if use_compression_up:
                     uplink_bytes_this_round += calc_comm_bytes(result)
                 else:
@@ -283,7 +284,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
         # Server side aggregation.
         # The returned value (if any) is the payload to be broadcast in *this* round.
         downlink_payload = None
-        if alg == 'ours':
+        if alg == 'bisarc':
             downlink_payload = server.aggregate(local_results, client_data_sizes)
         elif alg == 'doublesqueeze':
             downlink_payload = server.aggregate(local_results, client_data_sizes)
@@ -293,7 +294,7 @@ def simulate_comm_overhead(args, alg: str) -> CommSeries:
 
         # Downlink billing + applying downlink to all clients (this round's broadcast).
         downlink_bytes_this_round = 0.0
-        if alg == 'ours':
+        if alg == 'bisarc':
             # ResidualServer.aggregate returns packed sparse when cr_down in (0,1).
             msg_size = (
                 calc_comm_bytes(downlink_payload)
@@ -346,7 +347,7 @@ def _plot_results(out_dir: str, results: Dict[str, CommSeries]):
 
     # Colors are fixed for comparability.
     style = {
-        'ours': dict(color='#d62728', linewidth=2.2),
+        'bisarc': dict(color='#d62728', linewidth=2.2),
         'fedavg': dict(color='#1f77b4', linewidth=2.0),
         'doublesqueeze': dict(color='#2ca02c', linewidth=2.0),
     }
@@ -457,7 +458,7 @@ def main():
     out_dir = os.path.join(_CODE_DIR, 'outputs', 'comm_overhead')
 
     # Run three algorithms as requested.
-    algs = ['ours', 'fedavg', 'doublesqueeze']
+    algs = ['bisarc', 'fedavg', 'doublesqueeze']
     results: Dict[str, CommSeries] = {}
     for alg in algs:
         results[alg] = simulate_comm_overhead(args, alg)

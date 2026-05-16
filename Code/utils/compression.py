@@ -100,7 +100,7 @@ def stochastic_quantize(tensor, num_bits=8):
     return out, total_bits
 
 
-def calc_qsgd_bytes(state_dict, num_bits=8):
+def calc_stochastic_quantization_bytes(state_dict, num_bits=8):
     total_bits = 0
     for p in state_dict.values():
         if p.dtype.is_floating_point:
@@ -108,3 +108,7 @@ def calc_qsgd_bytes(state_dict, num_bits=8):
         else:
             total_bits += p.numel() * p.element_size() * 8
     return total_bits / 8.0
+
+
+def calc_qsgd_bytes(state_dict, num_bits=8):
+    return calc_stochastic_quantization_bytes(state_dict, num_bits)

@@ -32,7 +32,7 @@ class FLTimer:
     def __init__(self):
         self.pack_time = 0.0
         self.unpack_time = 0.0
-        self.total_fit_time = 0.0  # 新增：记录一整轮的总时间
+        self.total_fit_time = 0.0  # Record the total time of a full fit round.
         self.pack_calls = 0
         self.unpack_calls = 0
         self.fit_calls = 0
@@ -61,29 +61,29 @@ class FLTimer:
         self.fit_calls += 1
 
     def save_final_stats(self, log_dir, client_id):
-        """实验结束时，计算时间占比并写入文件"""
+        """Compute time ratios at the end of the experiment and write them to disk."""
         if self.fit_calls == 0:
             return
 
-        # 计算总耗时、打包耗时、解包耗时
+        # Compute total, packing, and unpacking time.
         total_time_ms = (self.total_fit_time / self.fit_calls) * 1000
         avg_pack = (self.pack_time / self.pack_calls) * 1000 if self.pack_calls > 0 else 0
         avg_unpack = (self.unpack_time / self.unpack_calls) * 1000 if self.unpack_calls > 0 else 0
         
-        # 剩下的时间自然就是真正的本地模型训练(前向+反向传播)时间
+        # The remaining time is local model training time.
         avg_train = total_time_ms - avg_pack - avg_unpack
 
-        # 计算百分比
+        # Compute percentages.
         pack_ratio = (avg_pack / total_time_ms) * 100
         unpack_ratio = (avg_unpack / total_time_ms) * 100
         train_ratio = (avg_train / total_time_ms) * 100
         
         stats_file = os.path.join(log_dir, "packing_ratio_stats.txt")
         with open(stats_file, "a", encoding="utf-8") as f:
-            f.write(f"Client {client_id} | 总耗时: {total_time_ms:.2f}ms\n")
-            f.write(f"  ├─ 打包开销: {avg_pack:.2f}ms ({pack_ratio:.2f}%)\n")
-            f.write(f"  ├─ 解包开销: {avg_unpack:.2f}ms ({unpack_ratio:.2f}%)\n")
-            f.write(f"  └─ 本地训练: {avg_train:.2f}ms ({train_ratio:.2f}%)\n\n")
+            f.write(f"Client {client_id} | Total time: {total_time_ms:.2f}ms\n")
+            f.write(f"  Pack overhead: {avg_pack:.2f}ms ({pack_ratio:.2f}%)\n")
+            f.write(f"  Unpack overhead: {avg_unpack:.2f}ms ({unpack_ratio:.2f}%)\n")
+            f.write(f"  Local train: {avg_train:.2f}ms ({train_ratio:.2f}%)\n\n")
 
 global_fl_timer = FLTimer()
 

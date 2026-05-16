@@ -1,10 +1,4 @@
-#!/bin/bash
 
-# ==========================================
-# 自动化联邦学习实验流水线
-# ==========================================
-
-# 定义需要按顺序执行的脚本数组
 SCRIPTS=(
     "fedbif.sh"
     "fedbif1.sh"
@@ -14,39 +8,33 @@ SCRIPTS=(
     "fedbif_shakespeare.sh"
 )
 
-echo "==================================================="
-echo "🚀 启动自动化批处理实验流水线"
-echo "==================================================="
+echo "Starting automated batch experiment pipeline"
 
-# 循环遍历并执行每一个脚本
+
+
 for script in "${SCRIPTS[@]}"; do
     echo ""
     echo "---------------------------------------------------"
-    echo "▶️  正在运行: $script"
-    echo "🕒 开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "Running: $script"
+    echo "Start time: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "---------------------------------------------------"
 
-    # 执行当前的脚本
+
     bash "$script"
 
-    # 捕获脚本的退出状态码
     status=$?
     
     if [ $status -eq 0 ]; then
-        echo "✅ $script 完美执行完成！"
+        echo "$script completed successfully."
     else
-        # 针对我们之前讨论过的 Server 自动关闭导致的客户端断开报错
-        echo "⚠️ $script 执行结束，返回了非零状态码 ($status)。"
-        echo "💡 提示: 联邦学习脚本末尾的 gRPC 断连报错属于正常现象，流水线将自动继续..."
+        echo "$script finished with a non-zero status code ($status)."
+        echo "Note: gRPC disconnection errors at the end of FL scripts can be expected; the pipeline will continue."
     fi
     
-    echo "🕒 结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
-    
-    # 可选：在两个大型实验之间休息 10 秒，让 GPU 彻底释放显存
+    echo "End time: $(date '+%Y-%m-%d %H:%M:%S')"
+
     sleep 10
 done
 
 echo ""
-echo "==================================================="
-echo "🎉 恭喜！所有 6 个实验脚本已全部执行完毕！"
-echo "==================================================="
+echo "All 6 experiment scripts have finished."

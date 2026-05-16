@@ -22,27 +22,27 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-# ── Vocabulary (same as LEAF Shakespeare) ──────────────────────────────────
+# Vocabulary (same as LEAF Shakespeare)
 ALL_LETTERS = (
     "\n !\"&'(),-.0123456789:;>?ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "[]abcdefghijklmnopqrstuvwxyz}"
 )
 NUM_LETTERS = len(ALL_LETTERS)   # 80
 
-# Map char → index  /  index → char
+# Map char to index and index to char.
 CHAR2IDX = {c: i for i, c in enumerate(ALL_LETTERS)}
 IDX2CHAR = {i: c for i, c in enumerate(ALL_LETTERS)}
 
 SEQ_LEN = 80   # input sequence length (same as LEAF)
 
-# ── Paths ───────────────────────────────────────────────────────────────────
+# Paths
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_TXT_PATH     = os.path.join(_ROOT, "dataset", "input.txt")
 SHAKESPEARE_DIR  = os.path.dirname(RAW_TXT_PATH)
 PROCESSED_JSON   = os.path.join(SHAKESPEARE_DIR, "shakespeare_all_data.json")
 
-# LEAF官方使用的URL：pg100.txt (UTF-8 Plain Text)
+# Official LEAF source URL: pg100.txt (UTF-8 plain text).
 # Ref: LEAF preprocess_shakespeare.py comment:
 #   http://www.gutenberg.org/cache/epub/100/pg100.txt
 PG_URL = "https://www.gutenberg.org/cache/epub/100/pg100.txt"
@@ -51,7 +51,7 @@ PG_ZIP_URL  = "http://www.gutenberg.org/files/100/old/1994-01-100.zip"
 PG_ZIP_NAME = "100.txt"
 
 
-# ── Download ─────────────────────────────────────────────────────────────────
+# Download
 
 def download_raw(url: str = PG_URL, dest: str = RAW_TXT_PATH) -> str:
     """
@@ -63,7 +63,7 @@ def download_raw(url: str = PG_URL, dest: str = RAW_TXT_PATH) -> str:
     raise FileNotFoundError(f"Shakespeare input file not found: {dest}")
 
 
-# ── Preprocessing ─────────────────────────────────────────────────────────────
+# Preprocessing
 
 def _clean_char(c: str) -> str:
     """Map a character to a vocab character, or return '' to drop it."""
@@ -90,11 +90,11 @@ def preprocess_shakespeare(
 
     Follows LEAF's preprocess_shakespeare.py logic exactly:
       Character line:  "^  ([a-zA-Z][a-zA-Z ]*)\\. (.*)"
-        → 2 spaces indent, name (mixed case), period, space, first dialogue on SAME line
+        -> 2 spaces indent, name (mixed case), period, space, first dialogue on SAME line
       Continuation:    "^    (.*)"
-        → 4 spaces indent
+        -> 4 spaces indent
       Play detection:  line contains "by William Shakespeare"
-        → title is 2–7 lines above that marker
+        -> title is 2-7 lines above that marker
       Comedy of Errors: uses different regex (no indent)
 
     Each user key: _remove_nonalphanumerics(play_title + '_' + CHARACTER_NAME)
@@ -111,13 +111,12 @@ def preprocess_shakespeare(
     with open(raw_path, 'r', encoding='utf-8', errors='replace') as f:
         lines = f.readlines()
 
-    user_texts = {}  # 角色名 -> 全部台词字符串
+    user_texts = {}
     current_role = None
     buffer = []
     for line in lines + ['\n']:
         line = line.rstrip('\r\n')
         if line.endswith(':') and len(line) > 1:
-            # 新角色出现，先保存上一个角色的台词
             if current_role and buffer:
                 text = ' '.join(buffer).replace('\n', ' ')
                 text = re.sub(r'   *', ' ', text)
@@ -128,13 +127,10 @@ def preprocess_shakespeare(
                 buffer = []
             current_role = line[:-1].strip()
         elif line.strip() == '':
-            # 空行，表示台词段落结束
             continue
         else:
-            # 台词内容
             if current_role:
                 buffer.append(line.strip())
-    # 最后一个角色
     if current_role and buffer:
         text = ' '.join(buffer).replace('\n', ' ')
         text = re.sub(r'   *', ' ', text)
@@ -145,7 +141,7 @@ def preprocess_shakespeare(
 
     print(f"[Shakespeare] Parsed {len(user_texts)} roles.")
 
-    # ── Build (x, y) sequence pairs ──────────────────────────────────────────
+    # Build (x, y) sequence pairs.
     users, num_samples_list = [], []
     user_data = {}
 
@@ -176,7 +172,7 @@ def preprocess_shakespeare(
     return data
 
 
-# ── Load ──────────────────────────────────────────────────────────────────────
+# Load
 
 def load_shakespeare_data(
     json_path: str = PROCESSED_JSON,
@@ -239,7 +235,7 @@ def load_shakespeare_data(
     return train_data, test_data, user_train_map, user_names
 
 
-# ── PyTorch Dataset ───────────────────────────────────────────────────────────
+# PyTorch Dataset
 
 class ShakespeareDataset(Dataset):
     """
@@ -259,7 +255,7 @@ class ShakespeareDataset(Dataset):
         return x, y
 
 
-# ── Partition generation ──────────────────────────────────────────────────────
+# Partition generation
 
 def generate_shakespeare_partition(
     num_clients: int = 100,
@@ -297,7 +293,7 @@ def generate_shakespeare_partition(
     return net_dataidx_map
 
 
-# ── Global cache ──────────────────────────────────────────────────────────────
+# Global cache
 
 _shakespeare_cache: dict = {}
 
@@ -313,7 +309,7 @@ def get_shakespeare_train_data(seed: int = 1234):
     return _shakespeare_cache[seed]
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# CLI
 
 if __name__ == "__main__":
     # 1. Download raw text

@@ -19,19 +19,19 @@ def calc_and_append_global_average(file_path):
         lines = f.readlines()
 
     for line in lines:
-        if "总耗时:" in line or "Total time:" in line:
+        if "Total time:" in line:
             m = re.search(r"(Total time):\s*([\d\.]+)ms", line)
-            if m: total_time_sum += float(m.group(1))
+            if m: total_time_sum += float(m.group(2))
             client_count += 1
-        elif "打包开销:" in line or "Pack overhead:" in line:
+        elif "Pack overhead:" in line:
             m = re.search(r"(Pack overhead):\s*([\d\.]+)ms", line)
-            if m: pack_time_sum += float(m.group(1))
-        elif "解包开销:" in line or "Unpack overhead:" in line:
+            if m: pack_time_sum += float(m.group(2))
+        elif "Unpack overhead:" in line:
             m = re.search(r"(Unpack overhead):\s*([\d\.]+)ms", line)
-            if m: unpack_time_sum += float(m.group(1))
-        elif "本地训练:" in line or "Local train:" in line:
+            if m: unpack_time_sum += float(m.group(2))
+        elif "Local train:" in line:
             m = re.search(r"(Local train):\s*([\d\.]+)ms", line)
-            if m: train_time_sum += float(m.group(1))
+            if m: train_time_sum += float(m.group(2))
 
     if client_count == 0:
         print("No valid client data found in the file, please check the logs!")

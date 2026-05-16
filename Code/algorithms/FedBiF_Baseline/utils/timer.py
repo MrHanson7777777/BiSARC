@@ -28,9 +28,9 @@ class FLTimer:
     def print_stats(self, prefix=""):
         avg_pack = (self.pack_time / self.pack_calls) * 1000 if self.pack_calls > 0 else 0
         avg_unpack = (self.unpack_time / self.unpack_calls) * 1000 if self.unpack_calls > 0 else 0
-        print(f"\n[{prefix}] 性能分析报告:")
-        print(f"  - 平均打包(压缩)耗时: {avg_pack:.2f} ms / 次")
-        print(f"  - 平均解包(解压)耗时: {avg_unpack:.2f} ms / 次\n")
+        print(f"\n[{prefix}] Performance profiling report:")
+        print(f"  - Average pack/compression time: {avg_pack:.2f} ms / call")
+        print(f"  - Average unpack/decompression time: {avg_unpack:.2f} ms / call\n")
 
-# 全局单例
+# Global singleton.
 global_fl_timer = FLTimer()

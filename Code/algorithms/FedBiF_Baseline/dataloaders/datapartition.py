@@ -130,10 +130,10 @@ if __name__ == "__main__":
     seed = 1234
     clients = [100]
     
-    # 把 cifar10 和 cifar100 都加上
+    # Include both CIFAR-10 and CIFAR-100.
     datasets = ["cifar10", "cifar100"] 
     
-    # 把 alpha 0.1 和 0.5 都加上
+    # Include both Dirichlet alpha values used in the experiments.
     part_strategies = ["labeldir0.1", "labeldir0.5"] 
     
     for dataset in datasets:

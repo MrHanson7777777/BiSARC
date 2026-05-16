@@ -1,4 +1,4 @@
-﻿import os
+import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import time
@@ -56,9 +56,9 @@ for config in TEST_CONFIGS:
 
     # ── Algorithm implementations ────────────────────────────────────────────
 
-    # 1. Ours (GPU Bitmap)
+    # 1. BiSARC (GPU Bitmap)
     @tf.function(jit_compile=True)
-    def pack_ours(vals, idxs):
+    def pack_bisarc(vals, idxs):
         mask = tf.scatter_nd(tf.expand_dims(idxs, 1), tf.ones_like(idxs, dtype=tf.bool), [DENSE_SIZE])
         if PAD_LEN > 0:
             mask = tf.pad(mask, [[0, PAD_LEN]])
@@ -68,7 +68,7 @@ for config in TEST_CONFIGS:
 
     # Remove jit_compile: real bitmap decode via tf.where (parallel addressing)
     @tf.function
-    def unpack_ours(p_mask, vals):
+    def unpack_bisarc(p_mask, vals):
         unmask = tf.reshape(tf.bitwise.bitwise_and(tf.expand_dims(p_mask, 1), POWERS_TF) > 0, [-1])[:DENSE_SIZE]
         idxs   = tf.cast(tf.where(unmask), tf.int32)
         dense  = tf.scatter_nd(idxs, vals, [DENSE_SIZE])
@@ -158,7 +158,7 @@ for config in TEST_CONFIGS:
         return dense
 
     methods = {
-        "Ours (GPU Bitmap)":    (pack_ours,            unpack_ours,            (tf_vals, tf_idxs)),
+        "BiSARC (GPU Bitmap)":    (pack_bisarc,            unpack_bisarc,            (tf_vals, tf_idxs)),
         "Std Top-K (No Comp)":  (pack_std,             unpack_std,             (tf_vals, tf_idxs)),
         "FedBiF (Corrected)":   (pack_fedbif_strict,   unpack_fedbif_strict,   (tf_dense,)),
         "FedPAQ (Corrected)":   (pack_fedpaq_strict,   unpack_fedpaq_strict,   (tf_dense,)),
@@ -171,7 +171,7 @@ for config in TEST_CONFIGS:
 
     for name, (p_fn, u_fn, inputs) in methods.items():
         p_data = p_fn(*inputs)
-        if name in ["Ours (GPU Bitmap)", "Std Top-K (No Comp)"]:
+        if name in ["BiSARC (GPU Bitmap)", "Std Top-K (No Comp)"]:
             u_data_input = (p_data[0], p_data[1])
         elif name in ["FedPAQ (Corrected)", "QSGD (Added)"]:
             u_data_input = p_data

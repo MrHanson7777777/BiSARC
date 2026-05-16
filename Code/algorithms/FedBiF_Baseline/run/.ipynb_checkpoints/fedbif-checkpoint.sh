@@ -2,11 +2,11 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-# 1. 默认参数修改对齐你的设定
+# 1. Default parameters aligned with the experiment setup.
 model="resnet18"; dataset_id=3; ip_end=0; gpu_str="0"; lr=0.01; bit=8; 
 momentum=0.9; l2=5e-4; epochs=5; batch_size=32; num_per_round=10; num_client=100; val_ratio=0.0; 
 
-# 外部传参逻辑 (保留官方逻辑，但默认值已修改)
+# External argument parsing. The original flow is kept with updated defaults.
 if [ -n "$1" ]; then
     dataset_id=$1
     model=$2
@@ -27,7 +27,7 @@ for ((i=0; i<$num_per_round; i++)); do
     gpu_clients+=("${gpu_str:$index:1}")
 done
 
-# 2. 修改 CIFAR-10 的全局轮次和数据划分策略
+# 2. Update the global round count and partition strategy for CIFAR-10.
 if [[ $dataset_id == 1 ]]; then
     dataset="fmnist"; rounds=100; ip_head="0.0.0.0:1";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
@@ -35,8 +35,8 @@ elif [[ $dataset_id == 2 ]]; then
     dataset="svhn"; rounds=100; ip_head="0.0.0.0:2";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
 elif [[ $dataset_id == 3 ]]; then
-    dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3"; # 修改：全局 400 轮
-    part_strategy_list=("labeldir0.5")                  # 修改：只跑 Dirichlet alpha=0.5 的 Non-IID
+    dataset="cifar10"; rounds=400; ip_head="0.0.0.0:3"; # Use 400 global rounds.
+    part_strategy_list=("labeldir0.5")                  # Run only Dirichlet alpha=0.5 Non-IID.
 elif [[ $dataset_id == 4 ]]; then
     dataset="cifar100"; rounds=200; ip_head="0.0.0.0:4";
     part_strategy_list=("iid" "labeldir0.3" "labelcnt0.3")
@@ -52,12 +52,12 @@ fi
 com_type="fedbif"; ip_mid=7; 
 ip="${ip_head}${ip_mid}${ip_end}"
 
-# 3. 将循环改为只执行一次我们设定好的 labeldir0.5 (索引为 0)
+# 3. Run only the configured labeldir0.5 setting (index 0).
 for b in 0; do  
     part_strategy=${part_strategy_list[${b}]}
 
     dir="../log/${dataset}+${num_client}/${dataset}+${part_strategy}/${model}+${com_type}+bit_${bit}+lr_${lr}/"
-    mkdir -p ${dir} # 确保日志目录存在
+    mkdir -p ${dir} # Ensure the log directory exists.
 
     python ../train/server.py \
         --com_type ${com_type} --bit ${bit} \

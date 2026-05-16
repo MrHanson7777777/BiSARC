@@ -25,7 +25,7 @@ class BasicBlock(nn.Module):
         elif norm_type == 'groupnorm':
             return nn.GroupNorm(min(num_groups, channels), channels)
         else:
-            raise ValueError(f"不支持的归一化: {norm_type}")
+            raise ValueError(f"Unsupported normalization: {norm_type}")
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -55,7 +55,7 @@ class ResNet18Fed(nn.Module):
         elif self.norm_type == 'groupnorm':
             return nn.GroupNorm(min(self.num_groups, channels), channels)
         else:
-            raise ValueError(f"不支持的归一化: {self.norm_type}")
+            raise ValueError(f"Unsupported normalization: {self.norm_type}")
 
     def _make_layer(self, planes, blocks, stride):
         strides = [stride] + [1] * (blocks - 1)
@@ -76,12 +76,8 @@ class ResNet18Fed(nn.Module):
         out = self.fc(out)
         return out
 
-# === FedBiF 接口兼容层 ===
 def ResNet18(num_classes=10, image_size=32, in_channels=3):
-    """
-    包装器：接收 FedBiF 原本的传参方式，但底层调用你们优化的 ResNet18Fed。
-    这里的 image_size 被静默忽略，因为 AdaptiveAvgPool2d 可以自适应各种尺寸。
-    """
+
     return ResNet18Fed(num_classes=num_classes, in_channels=in_channels, norm_type='groupnorm')
 
 class Bottleneck(nn.Module):
@@ -109,7 +105,7 @@ class Bottleneck(nn.Module):
         elif norm_type == 'groupnorm':
             return nn.GroupNorm(min(num_groups, channels), channels)
         else:
-            raise ValueError(f"不支持的归一化: {norm_type}")
+            raise ValueError(f"Unsupported normalization: {norm_type}")
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -119,6 +115,5 @@ class Bottleneck(nn.Module):
         out = F.relu(out)
         return out
 
-# 保留这下面两行，防止 plugin/models.py 找不到大模型报错
 ResNet101 = None
 ResNet50 = None

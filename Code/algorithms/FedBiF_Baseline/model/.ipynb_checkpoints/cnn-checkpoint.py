@@ -1,21 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-统一 CNN 模型库
-底层的模型结构已完全替换为 Ours 实验中的结构，保证控制变量的绝对纯净。
-"""
+
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-# ================================================================== #
-#                         基础残差块                                 #
-# ================================================================== #
+
 
 class _ResBlock(nn.Module):
-    """通用残差块"""
+    """Generic Residual Block"""
     def __init__(self, in_ch, out_ch, stride=1):
         super().__init__()
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3, stride, 1, bias=False)
@@ -36,12 +31,9 @@ class _ResBlock(nn.Module):
         return F.relu(out)
 
 
-# ================================================================== #
-#                            MNIST CNN                               #
-# ================================================================== #
 
 class CNNMnist(nn.Module):
-    """用于 MNIST（28×28 灰度图）的小型 CNN"""
+    """Small CNN for MNIST (28x28 grayscale images)"""
     def __init__(self, num_channels=1, num_classes=10):
         super().__init__()
         self.conv1 = nn.Conv2d(num_channels, 32, 3, 1, 1)
@@ -54,31 +46,28 @@ class CNNMnist(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = self.pool(x)                     # 28 -> 14
+        x = self.pool(x)                     
         x = F.relu(self.conv2(x))
-        x = self.pool(x)                     # 14 -> 7
+        x = self.pool(x)                    
         x = self.dropout1(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = self.dropout2(x)
         x = self.fc2(x)
-        return x                             # 返回 logits
+        return x                             
 
 
-# ================================================================== #
-#                          CIFAR-10 CNN                              #
-# ================================================================== #
 
 class CNNCifar(nn.Module):
-    """用于 CIFAR-10 / CIFAR-100（32×32 彩色图）的 CNN（带残差块）"""
+    """CNN with residual blocks for CIFAR-10 / CIFAR-100 (32x32 color images)"""
     def __init__(self, num_classes=10):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
 
-        self.layer1 = self._make_layer(64, 64, 2, stride=1)    # 32×32
-        self.layer2 = self._make_layer(64, 128, 2, stride=2)   # 16×16
-        self.layer3 = self._make_layer(128, 256, 2, stride=2)  # 8×8
+        self.layer1 = self._make_layer(64, 64, 2, stride=1)    
+        self.layer2 = self._make_layer(64, 128, 2, stride=2)   
+        self.layer3 = self._make_layer(128, 256, 2, stride=2)  
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(256, num_classes)
@@ -101,13 +90,10 @@ class CNNCifar(nn.Module):
         return x
 
 
-# ================================================================== #
-#                          FEMNIST CNN                               #
-# ================================================================== #
 
 class CNNFemnist(nn.Module):
     """
-    用于 FEMNIST（28×28 灰度图，62 类）的 CNN。
+    CNN for FEMNIST (28x28 grayscale images, 62 classes).
     """
     def __init__(self, num_channels=1, num_classes=62):
         super().__init__()
@@ -121,22 +107,18 @@ class CNNFemnist(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = self.pool(x)                     # 28 -> 14
+        x = self.pool(x)               
         x = F.relu(self.conv2(x))
-        x = self.pool(x)                     # 14 -> 7
+        x = self.pool(x)            
         x = self.dropout1(x)
-        x = x.view(x.size(0), -1)            # flatten: (B, 64*7*7)
+        x = x.view(x.size(0), -1)      
         x = F.relu(self.fc1(x))
         x = self.dropout2(x)
         x = self.fc2(x)
-        return x                             # 返回 logits
+        return x                         
 
 
-# ================================================================== #
-#    FedBiF 接口兼容层 (无脑骗过 plugin/models.py 的 Import 检查)      #
-# ================================================================== #
 
 CNN_MNIST = CNNMnist
 CNN_CIFAR = CNNCifar
-# 假设 FedBiF 内部还有对 SVHN 的导入，用 CNNCifar 糊弄一下，反正你不跑它
 CNN_SVHN = CNNCifar

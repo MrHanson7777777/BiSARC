@@ -12,7 +12,7 @@ def calc_global_average(file_path):
     total_unpack = 0.0
     valid_client_count = 0
 
-    pattern = re.compile(r"(Average Pack \(Quantization\)):\s*([\d\.]+)\s*ms\s*\|\s*(?:平均解包\(反量化\)|Average Unpack \(Dequantization\)):\s*([\d\.]+)\s*ms")
+    pattern = re.compile(r"(Average Pack \(Quantization\)):\s*([\d\.]+)\s*ms\s*\|\s*(?:Average Unpack \(Dequantization\)):\s*([\d\.]+)\s*ms")
 
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:

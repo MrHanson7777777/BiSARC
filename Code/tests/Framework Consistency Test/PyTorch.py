@@ -1,4 +1,4 @@
-﻿import os, time, math
+import os, time, math
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['MLIR_CRASH_REPRODUCER_DIRECTORY'] = 'disabled'
 
@@ -135,8 +135,8 @@ for config in TEST_CONFIGS:
 
     # ── Algorithm implementations ────────────────────────────────────────────
 
-    # 1. Ours (GPU Bitmap) — BiSARC bit-level packing
-    def pack_ours(vals, idxs):
+    # 1. BiSARC (GPU Bitmap) — BiSARC bit-level packing
+    def pack_bisarc(vals, idxs):
         mask = torch.zeros(DENSE_SIZE, dtype=torch.bool, device=device)
         mask[idxs] = True
         if PAD_LEN > 0:
@@ -144,7 +144,7 @@ for config in TEST_CONFIGS:
         packed_mask = (mask.view(-1, 8).to(torch.uint8) * POWERS_PT).sum(dim=1).to(torch.uint8)
         return packed_mask, vals
 
-    def unpack_ours(packed):
+    def unpack_bisarc(packed):
         p_mask, v = packed
         unmask = (torch.bitwise_and(p_mask.unsqueeze(1), POWERS_PT) > 0).view(-1)[:DENSE_SIZE]
         dense = torch.zeros(DENSE_SIZE, dtype=torch.float32, device=device)
@@ -247,7 +247,7 @@ for config in TEST_CONFIGS:
         return dense
 
     methods = {
-        "Ours (GPU Bitmap)":   (pack_ours,           unpack_ours,           (pt_vals, pt_idxs)),
+        "BiSARC (GPU Bitmap)":   (pack_bisarc,           unpack_bisarc,           (pt_vals, pt_idxs)),
         "Std Top-K (No Comp)": (pack_std,            unpack_std,            (pt_vals, pt_idxs)),
         "FedBiF (Corrected)":  (pack_fedbif_strict,  unpack_fedbif_strict,  (pt_dense,)),
         "FedPAQ (Corrected)":  (pack_fedpaq_strict,  unpack_fedpaq_strict,  (pt_dense,)),
